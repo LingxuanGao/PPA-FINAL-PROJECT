@@ -170,20 +170,79 @@ glimpse(philly_hotspots)
 
 # 2. Exploratory Data Analysis
 
-## 1.1 Temporal Analysis
+## 2.1 Temporal Analysis
 
-```{r Temporal Analysis}
+We reorganized the monthly eviction-filing counts by grouping each month into a season (Winter, Spring, Summer, Fall).
+We computed four separate seasonal baselines:
 
-ggplot(philly_barchart, aes(x = date, y = month_filings)) +
-  geom_line(color = "#3182bd", size = 1) +
-  geom_point(color = "#08519c", size = 1.5) +
-  labs(
-    title = "Monthly Eviction Filings in Philadelphia",
-    subtitle = "Trend from 2020 to 2024",
-    x = "Date",
-    y = "Number of Filings",
-    caption = "Source: Eviction Lab Philadelphia Tracking"
-  ) +
-  plotTheme
+the historical average for Winter/Spring/Summer/Fall months
+
+Then we produced a four-panel faceted plot to let us compare each season to what is “normal” for that season.
+
+```{r season}
+
+library(tidyverse)
+library(lubridate)
+
+# Add season column
+philly_barchart2 <- philly_barchart %>%
+  mutate(
+    # extract month number
+    m = month(date),
+    season = case_when(
+      m %in% c(12, 1, 2) ~ "Winter",
+      m %in% c(3, 4, 5)  ~ "Spring",
+      m %in% c(6, 7, 8)  ~ "Summer",
+      m %in% c(9, 10, 11) ~ "Fall"
+    )
+  )
+
+# Calculate true seasonal averages
+season_baseline <- philly_barchart2 %>%
+  group_by(season) %>%
+  summarise(season_avg = mean(month_filings, na.rm = TRUE))
+
+season_baseline
+
 
 ```
+
+
+```{r seaon chart}
+
+ggplot(philly_barchart2, aes(x = date, y = month_filings)) +
+  geom_col(fill = "#3182bd") +
+  geom_hline(
+    data = season_baseline,
+    aes(yintercept = season_avg),
+    linetype = "dashed"
+  ) +
+  facet_wrap(~ season, ncol = 2, scales = "free_y") +
+  labs(
+    title = "Monthly Eviction Filings by Season",
+    subtitle = "Each panel shows filings and seasonal baseline",
+    x = "Date",
+    y = "Eviction filings"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 13),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+**Patterns:**
+
+1.Eviction filings were heavily suppressed across all seasons in 2020–2021.
+Every season shows extremely low activity during the early pandemic period.
+
+2.Beginning in 2022, filings rebound sharply—but not uniformly across seasons.
+-Summer 2022 displays one of the largest spikes in the dataset.
+-Fall and Spring quickly rise back to their historical levels.
+-Winter rebounds more unevenly but eventually stabilizes.
+So the seasonal cut reveals that the return to “normal” was staggered, with some seasons experiencing larger surges than others.
+
+3.From 2023 onward, virtually every season settles at or slightly above its long-term seasonal baseline.
+This indicates a new post-pandemic equilibrium where eviction activity has stabilized.
+
+
