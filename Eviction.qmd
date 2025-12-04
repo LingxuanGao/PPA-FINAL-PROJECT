@@ -102,11 +102,70 @@ palette5 <- c("#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c")
 
 # 1. Data Source
 
+## Load and clean all the datasets
 ```{r load data}
 
-# Read 
-philly_barchart <- read.csv("data/philadelphia_barchart.csv")%>%
-  mutate(date = mdy(paste0(month, "/01")))
+# Monthly totals vs baseline (city-wide)
+philly_barchart <- readr::read_csv("data/philadelphia_barchart.csv") %>%
+  mutate(
+    # "01/2020" -> 2020-01-01
+    date = my(month)
+  )
+
+# Claims severity over time
+philly_claims_monthly <- readr::read_csv("data/philadelphia_claims_monthly.csv") %>%
+  mutate(
+    # already in ISO format like "2020-01-01"
+    month_date = ymd(month_date)
+  )
+
+# Group-level (race, gender, etc.) monthly trends
+philly_linechart <- readr::read_csv("data/philadelphia_linechart.csv") %>%
+  mutate(
+    # "11/2024" -> 2024-11-01
+    month_date = my(month)
+  )
+
+# Census tract map snapshot
+philly_map <- readr::read_csv("data/philadelphia_map.csv") %>%
+  mutate(
+    # "01/11/2024" likely means 01-11-2024 (1 November 2024)
+    month_date = dmy(month_date)
+  )
+
+# Tract-level monthly pre/post pandemic
+philly_monthly_2020_2021 <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
+  mutate(
+    month_date = my(month)
+  )
+
+# Tract-level weekly pre/post pandemic
+philly_weekly_2020_2021 <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
+  mutate(
+    week_date = ymd(week_date)
+  )
+
+# Property code / license violations (point data)
+li_violations <- readr::read_csv("data/li_violations.csv")
+
+# Hotspot properties (top filers)
+philly_hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
+  mutate(
+    time_period = ymd(time_period),
+    end_date    = ymd(end_date)
+  )
+
+# Quick sanity checks
+glimpse(philly_barchart)
+glimpse(philly_claims_monthly)
+glimpse(philly_linechart)
+glimpse(philly_map)
+glimpse(philly_monthly_2020_2021)
+glimpse(philly_weekly_2020_2021)
+glimpse(li_violations)
+glimpse(philly_hotspots)
+
+
 ```
 
 # 2. Exploratory Data Analysis
