@@ -100,5 +100,31 @@ mapTheme <- theme(
 palette5 <- c("#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c")
 ```
 
-# 1. Exploratory Data Analysis
+# 1. Data Source
 
+```{r load data}
+
+# Read 
+philly_barchart <- read.csv("data/philadelphia_barchart.csv")%>%
+  mutate(date = mdy(paste0(month, "/01")))
+```
+
+# 2. Exploratory Data Analysis
+
+## 1.1 Temporal Analysis
+
+```{r Temporal Analysis}
+
+ggplot(philly_barchart, aes(x = date, y = month_filings)) +
+  geom_line(color = "#3182bd", size = 1) +
+  geom_point(color = "#08519c", size = 1.5) +
+  labs(
+    title = "Monthly Eviction Filings in Philadelphia",
+    subtitle = "Trend from 2020 to 2024",
+    x = "Date",
+    y = "Number of Filings",
+    caption = "Source: Eviction Lab Philadelphia Tracking"
+  ) +
+  plotTheme
+
+```
