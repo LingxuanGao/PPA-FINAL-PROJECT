@@ -499,9 +499,9 @@ tract_base <- map_sf %>%
 ```
 
 
----
 
-### 3.2 Add ACS demographics & housing
+
+## 3.2 Add ACS demographics & housing
 
 ```{r spatial_acs, message=FALSE, warning=FALSE}
 acs_vars <- c(
@@ -538,9 +538,89 @@ acs_philly <- tidycensus::get_acs(
 
 # Attach ACS to tract base and to the spatial object
 tract_context <- tract_base %>%
-  dplyr::left_join(acs_philly, by = "GEOID")
+  left_join(acs_philly, by = "GEOID")
 
-map_sf_context <- map_sf %>%
-  dplyr::left_join(acs_philly, by = "GEOID")
+map_sf_context <- map_sf %>%       # or map_sf_context if you’d already created it
+  left_join(acs_philly, by = "GEOID")
 ```
+
+
+
+## 3.3 Add landlord hotspot intensity
+
+
+```{r spatial_hotspots, message=FALSE, warning=FALSE}
+# Hotspot landlords as points (you already use this for the bubble map)
+hotspot_sf <- sf::st_as_sf(
+  hotspots,
+  coords = c("lon", "lat"),
+  crs = 4326
+) %>%
+  sf::st_transform(sf::st_crs(map_sf_context))
+
+# Spatial join: assign each hotspot property to a tract
+hotspots_by_tract <- sf::st_join(
+  hotspot_sf,
+  map_sf_context["GEOID"],
+  left = FALSE
+) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::group_by(GEOID) %>%
+  dplyr::summarise(
+    hotspot_filings     = sum(filings, na.rm = TRUE),
+    n_hotspot_props     = dplyr::n(),
+    n_hotspot_landlords = dplyr::n_distinct(xplaintiff),
+    .groups = "drop"
+  )
+
+map_sf_context <- map_sf_context %>%
+  dplyr::left_join(hotspots_by_tract, by = "GEOID") %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(hotspot_filings, n_hotspot_props, n_hotspot_landlords),
+      ~ tidyr::replace_na(., 0)
+    )
+  )
+```
+
+
+## 3.4 Add historic code-violation intensity
+
+
+```{r spatial_violations, message=FALSE, warning=FALSE}
+# Violations as points
+li_violations_sf <- sf::st_as_sf(
+  li_violations,
+  coords = c("lng", "lat"),
+  crs = 4326
+) %>%
+  sf::st_transform(sf::st_crs(map_sf_context))
+
+# Join each violation to a tract
+viol_by_tract <- sf::st_join(
+  li_violations_sf,
+  map_sf_context["GEOID"],
+  left = FALSE
+) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::group_by(GEOID) %>%
+  dplyr::summarise(
+    violations_total = dplyr::n(),
+    violations_types = dplyr::n_distinct(violationdescription),
+    .groups = "drop"
+  )
+
+map_sf_context <- map_sf_context %>%
+  dplyr::left_join(viol_by_tract, by = "GEOID") %>%
+  dplyr::mutate(
+    violations_total = tidyr::replace_na(violations_total, 0),
+    violations_types = tidyr::replace_na(violations_types, 0),
+    viol_per_1k = dplyr::if_else(
+      total_pop > 0,
+      1000 * violations_total / total_pop,
+      NA_real_
+    )
+  )
+```
+
 
