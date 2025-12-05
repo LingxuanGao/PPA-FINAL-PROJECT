@@ -145,9 +145,6 @@ weekly <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
     week_date = ymd(week_date)
   )
 
-# Property code / license violations (point data)
-violations <- readr::read_csv("data/li_violations.csv")
-
 # Hotspot properties (top filers)
 hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
   mutate(
@@ -281,55 +278,119 @@ p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_ty
 gridExtra::grid.arrange(p1, p2, ncol = 1)
 ```
 
+## 2.2 Spatial Analysis
+
+### Load Spatial Data
 ```{r}
 
-ggplot(mapdata, aes(x = month_rate)) +
-  geom_histogram(bins = 40, fill = "#3182bd", alpha = 0.8) +
+library(sf)
+library(tidyverse)
+library(viridis)
+library(lubridate)
+
+# Read your GeoJSONs
+boundary <- st_read("data/City_Limits.geojson")
+pa_tracts <- st_read("data/PA-tracts.geojson")
+
+# Join eviction data with tract geometry
+philly_tracts <- pa_tracts %>%
+  filter(str_starts(GEOID, "42101"))
+
+mapdata <- mapdata %>%
+  mutate(id = as.character(id))
+
+philly_tracts <- philly_tracts %>%
+  mutate(GEOID = as.character(GEOID))
+
+
+map_sf <- philly_tracts %>%
+  left_join(mapdata, by = c("GEOID" = "id"))
+```
+
+### Eviction rate map for the Nov 2024
+```{r}
+latest_month <- max(map_sf$month_date, na.rm = TRUE)
+
+ggplot(
+  map_sf %>% filter(month_date == latest_month)
+) +
+  geom_sf(aes(fill = month_rate), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1) +
   labs(
-    title = "Distribution of Monthly Eviction Rates Across Tracts",
-    x = "Eviction Rate (per tract)",
-    y = "Count of tracts"
+    title = paste0("Eviction Filing Rate by Census Tract – ", latest_month),
+    fill  = "Eviction Rate"
   ) +
   theme_minimal()
 
 
 ```
-
+### Persistence of high-risk tracts (spatial pattern)
 ```{r}
+threshold <- quantile(map_sf$month_rate, 0.8, na.rm = TRUE)
 
-ggplot(mapdata, aes(x = factor(year(month_date)), y = month_rate)) +
-  geom_boxplot(fill = "#6baed6") +
-  labs(
-    title = "Tract-Level Eviction Rates Over Time",
-    x = "Year",
-    y = "Eviction Rate"
-  ) +
-  theme_minimal()
-
-
-```
-```{r}
-threshold <- mapdata %>%
-  summarise(cut = quantile(month_rate, 0.8, na.rm = TRUE)) %>%
-  pull(cut)
-threshold
-
-tract_risk <- mapdata %>%
-  mutate(high_risk = if_else(month_rate >= threshold, 1, 0)) %>%
-  group_by(id) %>%
+tract_risk <- map_sf %>%
+  st_drop_geometry() %>%                        # strip geometry
+  mutate(high = if_else(month_rate >= threshold, 1L, 0L)) %>%
+  group_by(GEOID) %>%
   summarise(
-    times_high_risk = sum(high_risk, na.rm = TRUE),
-    avg_rate = mean(month_rate, na.rm = TRUE)
+    times_high = sum(high, na.rm = TRUE),
+    .groups = "drop"
   )
 
-ggplot(tract_risk, aes(x = times_high_risk)) +
-  geom_histogram(binwidth = 1, fill = "#cb181d") +
+risk_sf <- philly_tracts %>%
+  left_join(tract_risk, by = "GEOID")          # now y is NOT sf → OK
+
+ggplot(risk_sf) +
+  geom_sf(aes(fill = times_high), color = NA) +
+  scale_fill_viridis_c(option = "inferno") +
   labs(
-    title = "How Many Times Did Each Tract Become High-Risk?",
-    x = "Number of High-Risk Months",
-    y = "Count of Tracts"
+    title = "Persistence of High Eviction Risk Across Tracts",
+    fill  = "Months above 80th percentile"
   ) +
   theme_minimal()
 
+
+```
+
+### Hotspot landlords (top eviction filers)
+```{r}
+hotspot_sf <- st_as_sf(
+  hotspots,
+  coords = c("lon", "lat"),
+  crs = 4326
+)
+
+ggplot() +
+  geom_sf(data = boundary, fill = "grey95", color = NA) +
+  geom_sf(data = hotspot_sf, aes(size = filings), alpha = 0.6, color = "#d7301f") +
+  scale_size(range = c(1, 10)) +
+  labs(
+    title = "Top Eviction-Filing Landlords in Philadelphia",
+    subtitle = "Bubble size shows number of filings",
+    size = "Filings"
+  ) +
+  theme_minimal()
+```
+
+### Combined risk (eviction × violations × landlord concentration)
+```{r}
+ggplot() +
+  geom_sf(data = map_sf %>% filter(month_date == latest_month),
+          aes(fill = month_rate), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1) +
+
+  geom_sf(data = viol_sf %>% sample_n(3000),
+          color = "white", size = 0.3, alpha = 0.3) +
+
+  geom_sf(data = hotspot_sf,
+          aes(size = filings), color = "#f03b20", alpha = 0.6) +
+
+  labs(
+    title = "Composite Risk Map: Eviction Rates + Violations + Landlord Hotspots",
+    subtitle = "A multilayer spatial risk view for policy targeting",
+    fill = "Eviction rate",
+    size = "Landlord filings"
+  ) +
+  theme_minimal()
 ```
 
