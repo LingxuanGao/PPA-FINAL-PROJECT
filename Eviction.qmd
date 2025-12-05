@@ -1,5 +1,5 @@
 ---
-title: "Eviction"
+title: "Eviction Risk in Philadelphia"
 author:
   - "Lingxuan Gao"
   - "Xiaoqing Chen"
@@ -73,7 +73,7 @@ plotTheme <- theme(
   axis.text.y = element_text(size = 10),
   axis.title = element_text(size = 11, face = "bold"),
   panel.background = element_blank(),
-  panel.grid.major = element_line(colour = "#D0D0D0", size = 0.2),
+  panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
   axis.ticks = element_blank(),
   legend.position = "right"
@@ -108,57 +108,64 @@ palette5 <- c("#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c")
 # Monthly totals vs baseline (city-wide)
 philly_barchart <- readr::read_csv("data/philadelphia_barchart.csv") %>%
   mutate(
-    # "01/2020" -> 2020-01-01
-    date = my(month)
+    date = lubridate::my(month)
   )
 
 # Claims severity over time
 philly_claims_monthly <- readr::read_csv("data/philadelphia_claims_monthly.csv") %>%
   mutate(
-    # already in ISO format like "2020-01-01"
-    month_date = ymd(month_date)
+    month_date = lubridate::ymd(month_date)
   )
 
 # Group-level (race, gender, etc.) monthly trends
 philly_linechart <- readr::read_csv("data/philadelphia_linechart.csv") %>%
   mutate(
-    # "11/2024" -> 2024-11-01
-    month_date = my(month)
+    month_date = lubridate::my(month)
   )
 
 # Census tract map snapshot
-mapdata <- readr::read_csv("data/philadelphia_map.csv") %>%
+philly_map <- readr::read_csv("data/philadelphia_map.csv") %>%
   mutate(
-    # "01/11/2024" likely means 01-11-2024 (1 November 2024)
-    month_date = dmy(month_date)
+   GEOID = as.character(id),
+    month_date = lubridate::dmy(month_date)
   )
 
 # Tract-level monthly pre/post pandemic
-monthly <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
+philly_monthly <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
   mutate(
-    month_date = my(month)
+    month_date = lubridate::my(month)
   )
 
-# Tract-level weekly pre/post pandemic
+# Tract-level weekly 
 weekly <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
   mutate(
-    week_date = ymd(week_date)
+    week_date = lubridate::ymd(week_date)
   )
+
+# Code / license violations (point data, older)
+li_violations <- readr::read_csv("data/li_violations.csv")
 
 # Hotspot properties (top filers)
 hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
   mutate(
-    time_period = ymd(time_period),
-    end_date    = ymd(end_date)
+    time_period = lubridate::ymd(time_period),
+    end_date    = lubridate::ymd(end_date)
   )
 
 
 
 ```
 
+Now we have:
+- **City-level series** (`philly_barchart`)
+- **Tract-level monthly data over multiple years** (`philly_monthly`)
+- **Snapshot map** (`philly_map`)
+- **Group-level disparities** (`philly_linechart`)
+- **Structural context** (historical violations, hotspot landlords)
+
 # 2. Exploratory Data Analysis
 
-## 2.1 Temporal Analysis
+## 2.1 Citywide filings over time
 
 We reorganized the monthly eviction-filing counts by grouping each month into a season (Winter, Spring, Summer, Fall).
 We computed four separate seasonal baselines:
@@ -194,7 +201,6 @@ season_baseline
 
 
 ```
-
 
 ```{r seaon chart}
 
@@ -278,7 +284,39 @@ p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_ty
 gridExtra::grid.arrange(p1, p2, ncol = 1)
 ```
 
-## 2.2 Spatial Analysis
+## 2.2 Tract-level risk and spatial patterns
+
+We uses the multi-year tract-level monthly data to see how skewed filings are across tracts.
+
+```{r eda_tract_distribution}
+tract_annual <- philly_monthly %>%
+  group_by(GEOID) %>%
+  summarize(
+    total_filings = sum(filings_2020, na.rm = TRUE),
+    mean_monthly  = mean(filings_2020, na.rm = TRUE),
+    n_months      = n(),
+    .groups = "drop"
+  )
+
+# Add a vertical line at the 80th percentile (top 20%)
+p80 <- quantile(tract_annual$mean_monthly, 0.80, na.rm = TRUE)
+
+ggplot(tract_annual, aes(x = mean_monthly)) +
+  geom_histogram(bins = 30, fill = "#3182bd") +
+  geom_vline(xintercept = p80, linetype = "dashed", color = "red") +
+  labs(
+    title = "Distribution of Mean Monthly Eviction Filings per Tract",
+    subtitle = paste0("Dashed line = 80th percentile (candidate high-risk cutoff: ",
+                      round(p80, 2), " filings/month)"),
+    x = "Mean monthly filings (multi-year)",
+    y = "Number of tracts"
+  ) +
+  plotTheme
+
+```
+
+This histogram shows that most census tracts have very low average eviction activity—often fewer than 2 filings per month.A small number of tracts sit far to the right, with 5–10+ filings per month, meaning they experience consistently high eviction pressure over multiple years.
+So eviction risk in Philly is highly **concentrated**, not evenly spread, which supports focusing limited legal aid and rent subsidies on that right-tail group of chronic hotspot tracts.
 
 ### Load Spatial Data
 ```{r}
@@ -296,7 +334,7 @@ pa_tracts <- st_read("data/PA-tracts.geojson")
 philly_tracts <- pa_tracts %>%
   filter(str_starts(GEOID, "42101"))
 
-mapdata <- mapdata %>%
+philly_map <- philly_map %>%
   mutate(id = as.character(id))
 
 philly_tracts <- philly_tracts %>%
@@ -304,26 +342,68 @@ philly_tracts <- philly_tracts %>%
 
 
 map_sf <- philly_tracts %>%
-  left_join(mapdata, by = c("GEOID" = "id"))
+  left_join(philly_map, by = c("GEOID" = "id"))
 ```
 
-### Eviction rate map for the Nov 2024
+### Eviction rate map since Nov 2024
 ```{r}
-latest_month <- max(map_sf$month_date, na.rm = TRUE)
 
 ggplot(
-  map_sf %>% filter(month_date == latest_month)
+  map_sf %>% filter(!is.na(month_rate))
 ) +
   geom_sf(aes(fill = month_rate), color = NA) +
   scale_fill_viridis(option = "magma", direction = -1) +
   labs(
-    title = paste0("Eviction Filing Rate by Census Tract – ", latest_month),
+    title = "Eviction Filing Rate by Census Tract (Nov 2024–Nov 2025)",
     fill  = "Eviction Rate"
   ) +
-  theme_minimal()
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title      = element_text(size = 14, face = "bold")
+  )
 
 
 ```
+
+```{r}
+
+map_compare <- map_sf %>%
+  mutate(
+    # month_diff is a ratio vs baseline
+    diff_vs_baseline = month_diff - 1
+  )
+
+ggplot(
+  map_compare %>% filter(!is.na(diff_vs_baseline))
+) +
+  geom_sf(aes(fill = diff_vs_baseline), color = NA) +
+  scale_fill_gradient2(
+    low  = "#4575b4",
+    mid  = "white",
+    high = "#d73027",
+    midpoint = 0,
+    labels = scales::percent_format(accuracy = 1),
+    name = "Change vs baseline\n(2023–24)"
+  ) +
+  labs(
+    title    = "Eviction Filing Rate by Census Tract",
+    subtitle = "Nov 2024–Nov 2025 vs typical 2023–2024 rate"
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title      = element_text(size = 14, face = "bold"),
+    plot.subtitle   = element_text(size = 10)
+  )
+
+
+```
+
+Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first.
+
 ### Persistence of high-risk tracts (spatial pattern)
 ```{r}
 threshold <- quantile(map_sf$month_rate, 0.8, na.rm = TRUE)
@@ -352,6 +432,33 @@ ggplot(risk_sf) +
 
 ```
 
+```{r eda_group_disparities}
+philly_linechart_share <- philly_linechart %>%
+  group_by(month) %>%
+  mutate(
+    share = month_filings / sum(month_filings, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  mutate(month_date = lubridate::my(month))  # "11/2024" → 2024-11-01
+
+ggplot(
+  philly_linechart_share,
+  aes(x = month_date, y = share, color = group)
+) +
+  geom_line() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title    = "Share of Eviction Filings by Group Over Time",
+    subtitle = "Each month: group's filings / total filings",
+    x = "Month",
+    y = "Share of filings",
+    color = "Group"
+  ) +
+  plotTheme +
+  theme(legend.position = "bottom")
+
+```
+
 ### Hotspot landlords (top eviction filers)
 ```{r}
 hotspot_sf <- st_as_sf(
@@ -372,25 +479,68 @@ ggplot() +
   theme_minimal()
 ```
 
-### Combined risk (eviction × violations × landlord concentration)
-```{r}
-ggplot() +
-  geom_sf(data = map_sf %>% filter(month_date == latest_month),
-          aes(fill = month_rate), color = NA) +
-  scale_fill_viridis(option = "magma", direction = -1) +
 
-  geom_sf(data = viol_sf %>% sample_n(3000),
-          color = "white", size = 0.3, alpha = 0.3) +
+# 3.Get Philadelphia Spatial Context
 
-  geom_sf(data = hotspot_sf,
-          aes(size = filings), color = "#f03b20", alpha = 0.6) +
+Now we shift from “describe” to “explain”:  
+We want to add **structural predictors**:
 
-  labs(
-    title = "Composite Risk Map: Eviction Rates + Violations + Landlord Hotspots",
-    subtitle = "A multilayer spatial risk view for policy targeting",
-    fill = "Eviction rate",
-    size = "Landlord filings"
-  ) +
-  theme_minimal()
+- Demographics & housing (ACS)  
+- Landlord concentration (hotspots)  
+- Housing quality (old violations)
+
+## 3.1 Base tract list
+```{r spatial_base}
+# One row per tract ID from the joined spatial layer
+tract_base <- map_sf %>%
+  sf::st_drop_geometry() %>%
+  dplyr::distinct(GEOID) %>%
+  dplyr::arrange(GEOID)
+```
+
+
+---
+
+### 3.2 Add ACS demographics & housing
+
+```{r spatial_acs, message=FALSE, warning=FALSE}
+acs_vars <- c(
+  total_pop  = "B01003_001",  # total population
+  pov_total  = "B17001_001",  # poverty universe
+  pov_below  = "B17001_002",  # below poverty
+  occ_total  = "B25003_001",  # occupied housing units
+  occ_renter = "B25003_003",  # renter-occupied units
+  med_rent   = "B25064_001",  # median gross rent
+  white      = "B03002_003",
+  black      = "B03002_004",
+  hispanic   = "B03002_012"
+)
+
+acs_philly <- tidycensus::get_acs(
+  geography = "tract",
+  state     = "PA",
+  county    = "Philadelphia",
+  survey    = "acs5",
+  year      = 2022,
+  variables = acs_vars,
+  output    = "wide",
+  geometry  = FALSE
+) %>%
+  dplyr::transmute(
+    GEOID,
+    total_pop    = total_popE,
+    pov_rate     = dplyr::if_else(pov_totalE > 0, pov_belowE / pov_totalE, NA_real_),
+    renter_share = dplyr::if_else(occ_totalE > 0, occ_renterE / occ_totalE, NA_real_),
+    med_rent     = med_rentE,
+    pct_black    = dplyr::if_else(total_popE > 0, blackE / total_popE, NA_real_),
+    pct_hispanic = dplyr::if_else(total_popE > 0, hispanicE / total_popE, NA_real_)
+  )
+
+# Attach ACS to tract base and to the spatial object
+tract_context <- tract_base %>%
+  dplyr::left_join(acs_philly, by = "GEOID")
+
+map_sf_context <- map_sf %>%
+  dplyr::left_join(acs_philly, by = "GEOID")
 ```
 
