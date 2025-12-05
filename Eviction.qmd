@@ -127,43 +127,34 @@ philly_linechart <- readr::read_csv("data/philadelphia_linechart.csv") %>%
   )
 
 # Census tract map snapshot
-philly_map <- readr::read_csv("data/philadelphia_map.csv") %>%
+mapdata <- readr::read_csv("data/philadelphia_map.csv") %>%
   mutate(
     # "01/11/2024" likely means 01-11-2024 (1 November 2024)
     month_date = dmy(month_date)
   )
 
 # Tract-level monthly pre/post pandemic
-philly_monthly_2020_2021 <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
+monthly <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
   mutate(
     month_date = my(month)
   )
 
 # Tract-level weekly pre/post pandemic
-philly_weekly_2020_2021 <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
+weekly <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
   mutate(
     week_date = ymd(week_date)
   )
 
 # Property code / license violations (point data)
-li_violations <- readr::read_csv("data/li_violations.csv")
+violations <- readr::read_csv("data/li_violations.csv")
 
 # Hotspot properties (top filers)
-philly_hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
+hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
   mutate(
     time_period = ymd(time_period),
     end_date    = ymd(end_date)
   )
 
-# Quick sanity checks
-glimpse(philly_barchart)
-glimpse(philly_claims_monthly)
-glimpse(philly_linechart)
-glimpse(philly_map)
-glimpse(philly_monthly_2020_2021)
-glimpse(philly_weekly_2020_2021)
-glimpse(li_violations)
-glimpse(philly_hotspots)
 
 
 ```
@@ -245,4 +236,100 @@ So the seasonal cut reveals that the return to “normal” was staggered, with 
 3.From 2023 onward, virtually every season settles at or slightly above its long-term seasonal baseline.
 This indicates a new post-pandemic equilibrium where eviction activity has stabilized.
 
+```{r eda_claim_severity}
+# Median claim over time
+p1 <- ggplot(philly_claims_monthly, aes(x = month_date, y = median_claim)) +
+  geom_line() +
+  geom_hline(aes(yintercept = median_claim_baseline), linetype = "dashed") +
+  labs(
+    title = "Median Eviction Claim Over Time",
+    x = "Month",
+    y = "Median claim amount ($)",
+    caption = "Dashed line: pre-pandemic median claim"
+  ) +
+  plotTheme
+
+# Share of very small vs very large claims
+philly_claims_long <- philly_claims_monthly %>%
+  select(month_date, sub1000, sub_med_rent, over_six_months_rent) %>%
+  pivot_longer(
+    cols = -month_date,
+    names_to = "claim_type",
+    values_to = "share"
+  ) %>%
+  mutate(
+    claim_type = recode(
+      claim_type,
+      sub1000             = "Claims < $1,000",
+      sub_med_rent        = "Claims < median rent",
+      over_six_months_rent = "Claims > 6 months of rent"
+    )
+  )
+
+p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_type)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Distribution of Claim Sizes Over Time",
+    x = "Month",
+    y = "Share of filings",
+    color = NULL
+  ) +
+  plotTheme +
+  theme(legend.position = "bottom")
+
+gridExtra::grid.arrange(p1, p2, ncol = 1)
+```
+
+```{r}
+
+ggplot(mapdata, aes(x = month_rate)) +
+  geom_histogram(bins = 40, fill = "#3182bd", alpha = 0.8) +
+  labs(
+    title = "Distribution of Monthly Eviction Rates Across Tracts",
+    x = "Eviction Rate (per tract)",
+    y = "Count of tracts"
+  ) +
+  theme_minimal()
+
+
+```
+
+```{r}
+
+ggplot(mapdata, aes(x = factor(year(month_date)), y = month_rate)) +
+  geom_boxplot(fill = "#6baed6") +
+  labs(
+    title = "Tract-Level Eviction Rates Over Time",
+    x = "Year",
+    y = "Eviction Rate"
+  ) +
+  theme_minimal()
+
+
+```
+```{r}
+threshold <- mapdata %>%
+  summarise(cut = quantile(month_rate, 0.8, na.rm = TRUE)) %>%
+  pull(cut)
+threshold
+
+tract_risk <- mapdata %>%
+  mutate(high_risk = if_else(month_rate >= threshold, 1, 0)) %>%
+  group_by(id) %>%
+  summarise(
+    times_high_risk = sum(high_risk, na.rm = TRUE),
+    avg_rate = mean(month_rate, na.rm = TRUE)
+  )
+
+ggplot(tract_risk, aes(x = times_high_risk)) +
+  geom_histogram(binwidth = 1, fill = "#cb181d") +
+  labs(
+    title = "How Many Times Did Each Tract Become High-Risk?",
+    x = "Number of High-Risk Months",
+    y = "Count of Tracts"
+  ) +
+  theme_minimal()
+
+```
 
