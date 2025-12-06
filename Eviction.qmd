@@ -623,4 +623,61 @@ map_sf_context <- map_sf_context %>%
   )
 ```
 
+## 3.5 311 housing-related complaint data
 
+```{r add_311_housing, message=FALSE, warning=FALSE}
+library(janitor)
+
+housing_types <- c(
+  "Dangerous Building Complaint",
+  "Construction Complaints",
+  "Maintenance Complaint",
+  "Sanitation Violation",
+  "Sanitation / Dumpster Violation",
+  "Dumpster Violation",
+  "Fire Safety Complaint",
+  "Smoke Detector",
+  "Graffiti Removal",
+  "Homeless Encampment Request"
+)
+
+housing311_raw <- readr::read_csv("data/public_cases_fc.csv") %>%
+  janitor::clean_names() %>%                # SERVICE_NAME -> service_name, etc.
+  dplyr::filter(service_name %in% housing_types) %>%
+  dplyr::filter(!is.na(lon), !is.na(lat)) %>%   # adjust if your columns are lon/lat
+  dplyr::mutate(
+    request_date = as.Date(requested_datetime),   # change name if needed
+    year         = lubridate::year(request_date)
+  ) %>%
+  dplyr::filter(year >= 2020)               # recent years only
+
+
+```
+
+```{r agg_311_by_tract}
+housing311_sf <- housing311_raw %>%
+  sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  sf::st_transform(sf::st_crs(map_sf))
+
+housing311_tract <- sf::st_join(
+  housing311_sf,
+  map_sf["GEOID"],
+  left = FALSE
+)
+
+housing311_by_tract <- housing311_tract %>%
+  sf::st_drop_geometry() %>%
+  dplyr::count(GEOID, name = "housing311_count") %>%
+  dplyr::left_join(
+    tract_context %>% dplyr::select(GEOID, total_pop),
+    by = "GEOID"
+  ) %>%
+  dplyr::mutate(
+    housing311_per_1k = dplyr::if_else(
+      total_pop > 0,
+      1000 * housing311_count / total_pop,
+      NA_real_
+    )
+  ) %>%
+  dplyr::select(GEOID, housing311_per_1k)
+```
