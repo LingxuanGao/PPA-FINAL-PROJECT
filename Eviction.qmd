@@ -42,6 +42,8 @@ Sys.setlocale("LC_TIME", "English")
 # Core tidyverse
 library(tidyverse)
 library(lubridate)
+library(janitor)
+library(scales)
 
 # Spatial data
 library(sf)
@@ -103,81 +105,71 @@ palette5 <- c("#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c")
 # 1. Data Source
 
 ## Load and clean all the datasets
+
 ```{r load data}
 
 # Monthly totals vs baseline (city-wide)
-philly_barchart <- readr::read_csv("data/philadelphia_barchart.csv") %>%
+philly_barchart <- read_csv("data/philadelphia_barchart.csv") %>%
   mutate(
-    date = lubridate::my(month)
+    date = my(month)
   )
 
 # Claims severity over time
-philly_claims_monthly <- readr::read_csv("data/philadelphia_claims_monthly.csv") %>%
+philly_claims_monthly <- read_csv("data/philadelphia_claims_monthly.csv") %>%
   mutate(
-    month_date = lubridate::ymd(month_date)
+    month_date = ymd(month_date)
   )
 
 # Group-level (race, gender, etc.) monthly trends
-philly_linechart <- readr::read_csv("data/philadelphia_linechart.csv") %>%
+philly_linechart <- read_csv("data/philadelphia_linechart.csv") %>%
   mutate(
-    month_date = lubridate::my(month)
+    month_date = my(month)
   )
 
 # Census tract map snapshot
-philly_map <- readr::read_csv("data/philadelphia_map.csv") %>%
+philly_map <- read_csv("data/philadelphia_map.csv") %>%
   mutate(
    GEOID = as.character(id),
-    month_date = lubridate::dmy(month_date)
+    month_date = dmy(month_date)
   )
 
 # Tract-level monthly pre/post pandemic
-philly_monthly <- readr::read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
+philly_monthly <- read_csv("data/philadelphia_monthly_2020_2021.csv") %>%
   mutate(
-    month_date = lubridate::my(month)
+    month_date = my(month)
   )
 
 # Tract-level weekly 
-weekly <- readr::read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
+weekly <- read_csv("data/philadelphia_weekly_2020_2021.csv") %>%
   mutate(
-    week_date = lubridate::ymd(week_date)
+    week_date = ymd(week_date)
   )
 
 # Code / license violations (point data, older)
-li_violations <- readr::read_csv("data/li_violations.csv")
+li_violations <- read_csv("data/li_violations.csv")
 
 # Hotspot properties (top filers)
-hotspots <- readr::read_csv("data/philadelphia_hotspots_media_report.csv") %>%
+hotspots <- read_csv("data/philadelphia_hotspots_media_report.csv") %>%
   mutate(
-    time_period = lubridate::ymd(time_period),
-    end_date    = lubridate::ymd(end_date)
+    time_period = ymd(time_period),
+    end_date    = ymd(end_date)
   )
-
-
 
 ```
 
-Now we have:
-- **City-level series** (`philly_barchart`)
-- **Tract-level monthly data over multiple years** (`philly_monthly`)
-- **Snapshot map** (`philly_map`)
-- **Group-level disparities** (`philly_linechart`)
-- **Structural context** (historical violations, hotspot landlords)
+Now we have: - **City-level series** (`philly_barchart`) - **Tract-level monthly data over multiple years** (`philly_monthly`) - **Snapshot map** (`philly_map`) - **Group-level disparities** (`philly_linechart`) - **Structural context** (historical violations, hotspot landlords)
 
 # 2. Exploratory Data Analysis
 
 ## 2.1 Citywide filings over time
 
-We reorganized the monthly eviction-filing counts by grouping each month into a season (Winter, Spring, Summer, Fall).
-We computed four separate seasonal baselines:
+We reorganized the monthly eviction-filing counts by grouping each month into a season (Winter, Spring, Summer, Fall). We computed four separate seasonal baselines:
 
 the historical average for Winter/Spring/Summer/Fall months
 
 Then we produced a four-panel faceted plot to let us compare each season to what is “normal” for that season.
 
 ```{r season}
-
-library(tidyverse)
-library(lubridate)
 
 # Add season column
 philly_barchart2 <- philly_barchart %>%
@@ -225,21 +217,17 @@ ggplot(philly_barchart2, aes(x = date, y = month_filings)) +
   )
 
 ```
+
 **Patterns:**
 
-1.Eviction filings were heavily suppressed across all seasons in 2020–2021.
-Every season shows extremely low activity during the early pandemic period.
+1.Eviction filings were heavily suppressed across all seasons in 2020–2021. Every season shows extremely low activity during the early pandemic period.
 
-2.Beginning in 2022, filings rebound sharply—but not uniformly across seasons.
--Summer 2022 displays one of the largest spikes in the dataset.
--Fall and Spring quickly rise back to their historical levels.
--Winter rebounds more unevenly but eventually stabilizes.
-So the seasonal cut reveals that the return to “normal” was staggered, with some seasons experiencing larger surges than others.
+2.Beginning in 2022, filings rebound sharply—but not uniformly across seasons. -Summer 2022 displays one of the largest spikes in the dataset. -Fall and Spring quickly rise back to their historical levels. -Winter rebounds more unevenly but eventually stabilizes. So the seasonal cut reveals that the return to “normal” was staggered, with some seasons experiencing larger surges than others.
 
-3.From 2023 onward, virtually every season settles at or slightly above its long-term seasonal baseline.
-This indicates a new post-pandemic equilibrium where eviction activity has stabilized.
+3.From 2023 onward, virtually every season settles at or slightly above its long-term seasonal baseline. This indicates a new post-pandemic equilibrium where eviction activity has stabilized.
 
 ```{r eda_claim_severity}
+
 # Median claim over time
 p1 <- ggplot(philly_claims_monthly, aes(x = month_date, y = median_claim)) +
   geom_line() +
@@ -271,7 +259,7 @@ philly_claims_long <- philly_claims_monthly %>%
 
 p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_type)) +
   geom_line() +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = percent) +
   labs(
     title = "Distribution of Claim Sizes Over Time",
     x = "Month",
@@ -281,7 +269,7 @@ p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_ty
   plotTheme +
   theme(legend.position = "bottom")
 
-gridExtra::grid.arrange(p1, p2, ncol = 1)
+grid.arrange(p1, p2, ncol = 1)
 ```
 
 ## 2.2 Tract-level risk and spatial patterns
@@ -292,8 +280,8 @@ We uses the multi-year tract-level monthly data to see how skewed filings are ac
 tract_annual <- philly_monthly %>%
   group_by(GEOID) %>%
   summarize(
-    total_filings = sum(filings_2020, na.rm = TRUE),
-    mean_monthly  = mean(filings_2020, na.rm = TRUE),
+    total_filings = sum(filings_counts, na.rm = TRUE),
+    mean_monthly  = mean(filings_counts, na.rm = TRUE),
     n_months      = n(),
     .groups = "drop"
   )
@@ -315,16 +303,11 @@ ggplot(tract_annual, aes(x = mean_monthly)) +
 
 ```
 
-This histogram shows that most census tracts have very low average eviction activity—often fewer than 2 filings per month.A small number of tracts sit far to the right, with 5–10+ filings per month, meaning they experience consistently high eviction pressure over multiple years.
-So eviction risk in Philly is highly **concentrated**, not evenly spread, which supports focusing limited legal aid and rent subsidies on that right-tail group of chronic hotspot tracts.
+This histogram shows that most census tracts have very low average eviction activity—often fewer than 2 filings per month.A small number of tracts sit far to the right, with 5–10+ filings per month, meaning they experience consistently high eviction pressure over multiple years. So eviction risk in Philly is highly **concentrated**, not evenly spread, which supports focusing limited legal aid and rent subsidies on that right-tail group of chronic hotspot tracts.
 
 ### Load Spatial Data
-```{r}
 
-library(sf)
-library(tidyverse)
-library(viridis)
-library(lubridate)
+```{r}
 
 # Read your GeoJSONs
 boundary <- st_read("data/City_Limits.geojson")
@@ -346,6 +329,7 @@ map_sf <- philly_tracts %>%
 ```
 
 ### Eviction rate map since Nov 2024
+
 ```{r}
 
 ggplot(
@@ -384,7 +368,7 @@ ggplot(
     mid  = "white",
     high = "#d73027",
     midpoint = 0,
-    labels = scales::percent_format(accuracy = 1),
+    labels = percent_format(accuracy = 1),
     name = "Change vs baseline\n(2023–24)"
   ) +
   labs(
@@ -405,7 +389,9 @@ ggplot(
 Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first.
 
 ### Persistence of high-risk tracts (spatial pattern)
+
 ```{r}
+
 threshold <- quantile(map_sf$month_rate, 0.8, na.rm = TRUE)
 
 tract_risk <- map_sf %>%
@@ -439,14 +425,14 @@ philly_linechart_share <- philly_linechart %>%
     share = month_filings / sum(month_filings, na.rm = TRUE)
   ) %>%
   ungroup() %>%
-  mutate(month_date = lubridate::my(month))  # "11/2024" → 2024-11-01
+  mutate(month_date = my(month))  # "11/2024" → 2024-11-01
 
 ggplot(
   philly_linechart_share,
   aes(x = month_date, y = share, color = group)
 ) +
   geom_line() +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = percent) +
   labs(
     title    = "Share of Eviction Filings by Group Over Time",
     subtitle = "Each month: group's filings / total filings",
@@ -460,6 +446,7 @@ ggplot(
 ```
 
 ### Hotspot landlords (top eviction filers)
+
 ```{r}
 hotspot_sf <- st_as_sf(
   hotspots,
@@ -479,27 +466,24 @@ ggplot() +
   theme_minimal()
 ```
 
-
 # 3.Get Philadelphia Spatial Context
 
-Now we shift from “describe” to “explain”:  
+Now we shift from “describe” to “explain”:\
 We want to add **structural predictors**:
 
-- Demographics & housing (ACS)  
-- Landlord concentration (hotspots)  
-- Housing quality (old violations)
+-   Demographics & housing (ACS)\
+-   Landlord concentration (hotspots)\
+-   Housing quality (old violations)
 
 ## 3.1 Base tract list
+
 ```{r spatial_base}
 # One row per tract ID from the joined spatial layer
 tract_base <- map_sf %>%
-  sf::st_drop_geometry() %>%
-  dplyr::distinct(GEOID) %>%
-  dplyr::arrange(GEOID)
+  st_drop_geometry() %>%
+  distinct(GEOID) %>%
+  arrange(GEOID)
 ```
-
-
-
 
 ## 3.2 Add ACS demographics & housing
 
@@ -516,7 +500,7 @@ acs_vars <- c(
   hispanic   = "B03002_012"
 )
 
-acs_philly <- tidycensus::get_acs(
+acs_philly <- get_acs(
   geography = "tract",
   state     = "PA",
   county    = "Philadelphia",
@@ -526,14 +510,14 @@ acs_philly <- tidycensus::get_acs(
   output    = "wide",
   geometry  = FALSE
 ) %>%
-  dplyr::transmute(
+  transmute(
     GEOID,
     total_pop    = total_popE,
-    pov_rate     = dplyr::if_else(pov_totalE > 0, pov_belowE / pov_totalE, NA_real_),
-    renter_share = dplyr::if_else(occ_totalE > 0, occ_renterE / occ_totalE, NA_real_),
+    pov_rate     = if_else(pov_totalE > 0, pov_belowE / pov_totalE, NA_real_),
+    renter_share = if_else(occ_totalE > 0, occ_renterE / occ_totalE, NA_real_),
     med_rent     = med_rentE,
-    pct_black    = dplyr::if_else(total_popE > 0, blackE / total_popE, NA_real_),
-    pct_hispanic = dplyr::if_else(total_popE > 0, hispanicE / total_popE, NA_real_)
+    pct_black    = if_else(total_popE > 0, blackE / total_popE, NA_real_),
+    pct_hispanic = if_else(total_popE > 0, hispanicE / total_popE, NA_real_)
   )
 
 # Attach ACS to tract base and to the spatial object
@@ -544,78 +528,73 @@ map_sf_context <- map_sf %>%       # or map_sf_context if you’d already create
   left_join(acs_philly, by = "GEOID")
 ```
 
-
-
 ## 3.3 Add landlord hotspot intensity
-
 
 ```{r spatial_hotspots, message=FALSE, warning=FALSE}
 # Hotspot landlords as points (you already use this for the bubble map)
-hotspot_sf <- sf::st_as_sf(
+hotspot_sf <- st_as_sf(
   hotspots,
   coords = c("lon", "lat"),
   crs = 4326
 ) %>%
-  sf::st_transform(sf::st_crs(map_sf_context))
+  st_transform(st_crs(map_sf_context))
 
 # Spatial join: assign each hotspot property to a tract
-hotspots_by_tract <- sf::st_join(
+hotspots_by_tract <- st_join(
   hotspot_sf,
   map_sf_context["GEOID"],
   left = FALSE
 ) %>%
-  sf::st_drop_geometry() %>%
-  dplyr::group_by(GEOID) %>%
-  dplyr::summarise(
+  st_drop_geometry() %>%
+  group_by(GEOID) %>%
+  summarise(
     hotspot_filings     = sum(filings, na.rm = TRUE),
-    n_hotspot_props     = dplyr::n(),
-    n_hotspot_landlords = dplyr::n_distinct(xplaintiff),
+    n_hotspot_props     = n(),
+    n_hotspot_landlords = n_distinct(xplaintiff),
     .groups = "drop"
   )
 
 map_sf_context <- map_sf_context %>%
-  dplyr::left_join(hotspots_by_tract, by = "GEOID") %>%
-  dplyr::mutate(
-    dplyr::across(
+  left_join(hotspots_by_tract, by = "GEOID") %>%
+  mutate(
+    across(
       c(hotspot_filings, n_hotspot_props, n_hotspot_landlords),
-      ~ tidyr::replace_na(., 0)
+      ~ replace_na(., 0)
     )
   )
 ```
 
-
 ## 3.4 Add historic code-violation intensity
-
 
 ```{r spatial_violations, message=FALSE, warning=FALSE}
 # Violations as points
-li_violations_sf <- sf::st_as_sf(
+li_violations_sf <- st_as_sf(
   li_violations,
   coords = c("lng", "lat"),
   crs = 4326
 ) %>%
-  sf::st_transform(sf::st_crs(map_sf_context))
+  st_transform(st_crs(map_sf_context))
 
 # Join each violation to a tract
-viol_by_tract <- sf::st_join(
+viol_by_tract <- st_join(
   li_violations_sf,
   map_sf_context["GEOID"],
   left = FALSE
 ) %>%
-  sf::st_drop_geometry() %>%
-  dplyr::group_by(GEOID) %>%
-  dplyr::summarise(
-    violations_total = dplyr::n(),
-    violations_types = dplyr::n_distinct(violationdescription),
+  st_drop_geometry() %>%
+  group_by(GEOID) %>%
+  summarise(
+    violations_total = n(),
+    violations_types = n_distinct(violationdescription),
     .groups = "drop"
   )
 
 map_sf_context <- map_sf_context %>%
-  dplyr::left_join(viol_by_tract, by = "GEOID") %>%
-  dplyr::mutate(
-    violations_total = tidyr::replace_na(violations_total, 0),
-    violations_types = tidyr::replace_na(violations_types, 0),
-    viol_per_1k = dplyr::if_else(
+  left_join(viol_by_tract, by = "GEOID") %>%
+  mutate(
+    violations_total = replace_na(violations_total, 0),
+    violations_types = replace_na(violations_types, 0),
+    viol_per_1k = if_else(
       total_pop > 0,
       1000 * violations_total / total_pop,
       NA_real_
@@ -626,7 +605,6 @@ map_sf_context <- map_sf_context %>%
 ## 3.5 311 housing-related complaint data
 
 ```{r add_311_housing, message=FALSE, warning=FALSE}
-library(janitor)
 
 housing_types <- c(
   "Dangerous Building Complaint",
@@ -641,43 +619,509 @@ housing_types <- c(
   "Homeless Encampment Request"
 )
 
-housing311_raw <- readr::read_csv("data/public_cases_fc.csv") %>%
-  janitor::clean_names() %>%                # SERVICE_NAME -> service_name, etc.
-  dplyr::filter(service_name %in% housing_types) %>%
-  dplyr::filter(!is.na(lon), !is.na(lat)) %>%   # adjust if your columns are lon/lat
-  dplyr::mutate(
+housing311_raw <- read_csv("data/public_cases_fc.csv") %>%
+  clean_names() %>%
+  filter(service_name %in% housing_types) %>%
+  filter(!is.na(lon), !is.na(lat)) %>%   # adjust if your columns are lon/lat
+  mutate(
     request_date = as.Date(requested_datetime),   # change name if needed
-    year         = lubridate::year(request_date)
+    year         = year(request_date)
   ) %>%
-  dplyr::filter(year >= 2020)               # recent years only
-
+  filter(year >= 2020)               # recent years only
 
 ```
 
 ```{r agg_311_by_tract}
-housing311_sf <- housing311_raw %>%
-  sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
-  sf::st_transform(sf::st_crs(map_sf))
 
-housing311_tract <- sf::st_join(
+housing311_sf <- housing311_raw %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  st_transform(st_crs(map_sf))
+
+housing311_tract <- st_join(
   housing311_sf,
   map_sf["GEOID"],
   left = FALSE
 )
 
 housing311_by_tract <- housing311_tract %>%
-  sf::st_drop_geometry() %>%
-  dplyr::count(GEOID, name = "housing311_count") %>%
-  dplyr::left_join(
-    tract_context %>% dplyr::select(GEOID, total_pop),
+  st_drop_geometry() %>%
+  count(GEOID, name = "housing311_count") %>%
+  left_join(
+    tract_context %>% select(GEOID, total_pop),
     by = "GEOID"
   ) %>%
-  dplyr::mutate(
-    housing311_per_1k = dplyr::if_else(
+  mutate(
+    housing311_per_1k = if_else(
       total_pop > 0,
       1000 * housing311_count / total_pop,
       NA_real_
     )
   ) %>%
-  dplyr::select(GEOID, housing311_per_1k)
+  select(GEOID, housing311_per_1k)
+
+```
+
+# 4. Build & Compare Predictive Models
+
+## 4.1 Master Data Setup & Feature Engineering
+
+### 4.1.1 Define Custom Time Periods (The "Nov-Nov" Fix)
+```{r}
+
+#  Prepare the Monthly Data with Custom Time Periods
+panel_setup <- philly_monthly %>% 
+  mutate(
+    # Convert text to Date
+    month_date = my(month),
+    
+    # --- CRITICAL FIX: Custom "Eviction Year" Logic ---
+    # We want the year to start in November.
+    # If month is Nov (11) or Dec (12), we assign it to the NEXT year.
+    # Example: Nov 2020 -> Period 2021
+    # Example: Nov 2024 -> Period 2025 (The most recent complete year)
+    period_year = if_else(
+      month(month_date) >= 11, 
+      year(month_date) + 1, 
+      year(month_date)
+    )
+  ) %>%
+  # Filter out data before Nov 2020 to ensure we have full 12-month cycles
+  filter(period_year >= 2021)
+```
+
+*need int
+
+### 4.1.2 Build Basic Tract-Year Panel 
+
+```{r}
+# Aggregate from Monthly to Annual (Period) Level
+model_df <- panel_setup %>% 
+  group_by(GEOID, period_year) %>% 
+  summarise(
+    # --- FIX: Variable Name Changed from filings_2020 ---
+    filings_total = sum(filings_counts, na.rm = TRUE),
+    mean_monthly  = mean(filings_counts, na.rm = TRUE),
+    
+    # Count how many months of data we have in this custom period
+    n_months      = n(),
+    .groups = "drop"
+  ) %>% 
+  
+  # Data Quality Check: Only keep periods with at least 10 months of data
+  filter(n_months >= 10)
+```
+
+Here we define what "High Risk" means and create the lag variable.
+
+```{r}
+# Create Target Variable (Y) and Lagged Predictor (X)
+model_df_lagged <- model_df %>% 
+  # A. Define "High Risk" Threshold per Year
+  group_by(period_year) %>% 
+  mutate(
+    # Calculate the 80th percentile threshold for THIS specific period
+    cutoff80  = quantile(mean_monthly, 0.80, na.rm = TRUE),
+    
+    # Create Binary Target: 1 if this tract is in the top 20%, 0 otherwise
+    high_risk = if_else(mean_monthly >= cutoff80, 1L, 0L)
+  ) %>% 
+  ungroup() %>% 
+  
+  # Create Lagged History (The most important predictor)
+  arrange(GEOID, period_year) %>% 
+  group_by(GEOID) %>% 
+  mutate(
+    # Previous year's mean monthly filings
+    lag_mean_monthly = lag(mean_monthly)
+  ) %>% 
+  ungroup() %>% 
+  
+  # Remove rows with no history (we can't train on the first year)
+  filter(!is.na(lag_mean_monthly))
+
+
+```
+
+:::{.callout-note}
+ We use 0.8 as the threshold because of The Pareto Principle / 80-20 Rule.
+:::
+
+### 4.1.3 Prepare External Features (Context)
+
+```{r}
+# A. Legacy Distress (Historic Violations 2012-2016)
+legacy_distress_join <- tract_context %>% 
+  select(GEOID, total_pop) %>% 
+  left_join(viol_by_tract, by = "GEOID") %>% 
+  mutate(
+    hist_viol_per_1k = if_else(total_pop > 0, (violations_total / total_pop) * 1000, 0)
+  ) %>%
+  select(GEOID, hist_viol_per_1k)
+
+# B. Hotspot Landlord Activity
+hotspot_join <- hotspots_by_tract %>% 
+  select(GEOID, hotspot_filings)
+
+# C. 311 Housing Complaints
+housing311_join <- housing311_by_tract %>% 
+  select(GEOID, housing311_per_1k)
+
+# D. Spatial Context 1: Distance to City Hall
+tract_centroids <- philly_tracts %>% st_centroid()
+city_hall <- st_sfc(st_point(c(-75.1635, 39.9526)), crs = 4326) %>% 
+  st_transform(st_crs(tract_centroids))
+
+dist_center <- st_distance(tract_centroids, city_hall)
+
+dist_center_join <- data.frame(
+  GEOID = tract_centroids$GEOID,
+  dist_center_km = as.numeric(dist_center) / 1000
+)
+
+# E. Spatial Context 2: Distance to Nearest Hotspot
+dist_hotspot <- st_distance(tract_centroids, hotspot_sf) 
+min_dist_hotspot <- apply(dist_hotspot, 1, min)
+
+dist_hotspot_join <- data.frame(
+  GEOID = tract_centroids$GEOID,
+  dist_hotspot_km = as.numeric(min_dist_hotspot) / 1000
+)
+
+# F. Neighborhood Typology (Clustering)
+# We cluster tracts based on static demographics to capture "neighborhood type"
+cluster_input <- tract_context %>%
+  st_drop_geometry() %>%
+  select(GEOID, pov_rate, renter_share, med_rent, pct_black, pct_hispanic) %>%
+  drop_na()
+
+set.seed(42)
+clusters <- kmeans(scale(cluster_input %>% select(-GEOID)), centers = 5)
+cluster_input$neighborhood_cluster <- factor(clusters$cluster)
+
+cluster_join <- cluster_input %>% select(GEOID, neighborhood_cluster)
+```
+
+### 4.1.4 Build Final Master Dataset
+
+```{r}
+training_data <- model_df_lagged %>% 
+  # Join Demographics (ACS)
+  left_join(tract_context %>% select(GEOID, pov_rate, renter_share, med_rent, pct_black, pct_hispanic), by = "GEOID") %>%
+  
+  # Join External Predictors
+  left_join(legacy_distress_join, by = "GEOID") %>%
+  left_join(hotspot_join, by = "GEOID") %>%
+  left_join(housing311_join, by = "GEOID") %>%
+  
+  # --- FIX: Now these match the names defined in 4.1.3 ---
+  left_join(dist_center_join, by = "GEOID") %>%
+  left_join(dist_hotspot_join, by = "GEOID") %>%  # Added missing join
+  left_join(cluster_join, by = "GEOID") %>%       # Added missing cluster join
+  
+  # Handle NAs created by joins (fill counts with 0)
+  mutate(
+    hotspot_filings   = replace_na(hotspot_filings, 0),
+    hist_viol_per_1k  = replace_na(hist_viol_per_1k, 0),
+    housing311_per_1k = replace_na(housing311_per_1k, 0)
+  ) %>%
+  
+  # Final cleanup
+  drop_na(pov_rate, renter_share)
+```
+
+## 4.2 Model Building
+
+### 4.2.1 Train/Test Split
+
+```{r}
+# 1. Define Variables
+# Ensure we drop NAs for ALL potential variables to keep samples consistent across models
+all_vars <- c("high_risk", "lag_mean_monthly", 
+              "pov_rate", "renter_share", "med_rent", "pct_black", "pct_hispanic",
+              "hist_viol_per_1k", "hotspot_filings", "housing311_per_1k",
+              "dist_center_km", "dist_hotspot_km", "neighborhood_cluster")
+
+model_data <- training_data %>%
+  drop_na(all_of(all_vars))
+
+# 2. Time-Based Split
+train_set <- model_data %>% filter(period_year < 2025)
+test_set  <- model_data %>% filter(period_year == 2025)
+```
+
+###4.2.2 Build 5 Competing Models
+```{r}
+# --- Model 1: Inertia Only (Lag) ---
+formula_1 <- high_risk ~ lag_mean_monthly
+
+# --- Model 2: Demographics (People) ---
+formula_2 <- high_risk ~ lag_mean_monthly + 
+                         pov_rate + renter_share + pct_black + med_rent
+
+# --- Model 3: Built Environment (Place Quality) ---
+formula_3 <- high_risk ~ lag_mean_monthly + 
+                         hist_viol_per_1k + hotspot_filings + housing311_per_1k
+
+# --- Model 4: Spatial Context (Location) ---
+formula_4 <- high_risk ~ lag_mean_monthly + 
+                         dist_center_km + dist_hotspot_km + neighborhood_cluster
+
+# --- Model 5: Full Integrated Model ---
+formula_5 <- high_risk ~ lag_mean_monthly + 
+                         pov_rate + pct_black + renter_share +
+                         hist_viol_per_1k + hotspot_filings + housing311_per_1k +
+                         dist_center_km + neighborhood_cluster
+
+# Train all models on the Training Set
+m1 <- glm(formula_1, data = train_set, family = "binomial")
+m2 <- glm(formula_2, data = train_set, family = "binomial")
+m3 <- glm(formula_3, data = train_set, family = "binomial")
+m4 <- glm(formula_4, data = train_set, family = "binomial")
+m5 <- glm(formula_5, data = train_set, family = "binomial")
+```
+
+### 4.2.3 Compare Model Performance
+
+```{r}
+library(pROC)
+library(caret)
+
+# Function to calculate metrics for a model
+calc_metrics <- function(model, test_data) {
+  # Predict probabilities
+  probs <- predict(model, newdata = test_data, type = "response")
+  # Predict class (0 or 1)
+  preds <- if_else(probs > 0.5, 1, 0)
+  
+  # Calculate Metrics
+  roc_obj  <- roc(test_data$high_risk, probs)
+  auc_val  <- as.numeric(auc(roc_obj))
+  accuracy <- mean(preds == test_data$high_risk)
+  aic_val  <- AIC(model)
+  
+  return(c(AUC = auc_val, Accuracy = accuracy, AIC = aic_val))
+}
+
+# Run comparison
+results <- data.frame(
+  Model = c("M1: Inertia", "M2: Demographics", "M3: Built Env", "M4: Spatial", "M5: Full"),
+  rbind(
+    calc_metrics(m1, test_set),
+    calc_metrics(m2, test_set),
+    calc_metrics(m3, test_set),
+    calc_metrics(m4, test_set),
+    calc_metrics(m5, test_set)
+  )
+)
+
+# Display Table
+library(knitr)
+kable(results, digits = 3, caption = "Model Comparison Table (Test Set Performance)")
+```
+### 4.2.4 Visual Comparison (ROC Curves)
+
+```{r}
+# Generate ROC objects
+roc1 <- roc(test_set$high_risk, predict(m1, newdata = test_set, type = "response"))
+roc2 <- roc(test_set$high_risk, predict(m2, newdata = test_set, type = "response"))
+roc3 <- roc(test_set$high_risk, predict(m3, newdata = test_set, type = "response"))
+roc4 <- roc(test_set$high_risk, predict(m4, newdata = test_set, type = "response"))
+roc5 <- roc(test_set$high_risk, predict(m5, newdata = test_set, type = "response"))
+
+# Plot
+ggroc(list(M1=roc1, M2=roc2, M3=roc3, M4=roc4, M5=roc5), size = 1) +
+  labs(title = "ROC Curve Comparison",
+       subtitle = "Which model predicts 2025 risk best?",
+       color = "Model Type") +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1")
+```
+## 4.3 Diagnostics on the Winning Model (M5)
+
+### 4.3.1
+
+We check if the Full Model successfully removed spatial clustering in errors.
+```{r}
+library(spdep)
+
+# Extract residuals from the best model
+train_set$m5_residuals <- residuals(m5, type = "deviance")
+
+# Map residuals to geometry
+resid_sf <- philly_tracts %>%
+  left_join(train_set %>% select(GEOID, m5_residuals), by = "GEOID") %>%
+  filter(!is.na(m5_residuals))
+
+# Calculate Moran's I
+coords <- st_centroid(resid_sf)
+knn_nb <- knearneigh(coords, k = 5)
+lw <- nb2listw(knn2nb(knn_nb), style = "W")
+
+moran_result <- moran.test(resid_sf$m5_residuals, lw)
+
+# Print Result (Ideally p-value > 0.05, or at least Moran's I is close to 0)
+print(moran_result)
+```
+
+### 4.3.2 Robustness Check: Spatial Cross-Validation (LOGOCV)
+```{r}
+library(caret)
+
+# 1. Define the Control Method: Leave-One-Group-Out
+# We use the 'neighborhood_cluster' we created earlier as the "Group"
+fit_control <- trainControl(
+  method = "CV", 
+  number = 5,              # 5 Clusters
+  savePredictions = TRUE,
+  classProbs = TRUE,       # Needed for ROC/AUC
+  summaryFunction = twoClassSummary, # Optimizes for AUC
+  index = createFolds(train_set$neighborhood_cluster, k = 5) # Critical: Split by Cluster!
+)
+
+# 2. Prepare Data for Caret (Needs "Yes/No" factor for classification)
+cv_data <- train_set %>%
+  mutate(high_risk_fac = factor(if_else(high_risk == 1, "High", "Low"), 
+                                levels = c("High", "Low"))) %>%
+  drop_na()
+
+# 3. Re-train Model 5 using Spatial CV
+# Note: We use the exact same formula as M5
+model_spatial_cv <- train(
+  high_risk_fac ~ lag_mean_monthly + 
+                  pov_rate + pct_black + renter_share +
+                  hist_viol_per_1k + hotspot_filings + housing311_per_1k +
+                  dist_center_km, # Removed 'neighborhood_cluster' from predictors because it's the split variable!
+  data = cv_data,
+  method = "glm",
+  family = "binomial",
+  trControl = fit_control,
+  metric = "ROC"
+)
+
+# 4. Print Results
+print(model_spatial_cv)
+```
+#5. Prediction for 2026 (The Future)
+
+We use the "Full Integrated Model" (M5) to forecast risk. The input for this prediction is the data from the most recent period (Nov 2024 – Nov 2025).
+
+```{r}
+# --- 1. Prepare the Input Data for 2026 ---
+# Logic: To predict 2026, the "lagged history" is the actual performance of 2025.
+
+future_input <- training_data %>%
+  filter(period_year == 2025) %>%   # Select the latest available data
+  select(
+    GEOID, 
+    # CRITICAL STEP: The 2025 average becomes the "lag" for 2026
+    lag_mean_monthly = mean_monthly, 
+    
+    # Keep all other static/structural predictors
+    pov_rate, pct_black, renter_share, med_rent,
+    hist_viol_per_1k, hotspot_filings, housing311_per_1k,
+    dist_center_km, neighborhood_cluster, dist_hotspot_km
+  ) %>%
+  drop_na()
+
+# --- 2. Generate Predictions ---
+# We use Model 5 (m5) to predict probabilities (0 to 1)
+# type = "response" output probabilities
+future_input$pred_prob <- predict(m5, newdata = future_input, type = "response")
+
+# --- 3. Classify Risk ---
+# We interpret > 50% probability as "High Risk"
+future_input <- future_input %>%
+  mutate(
+    pred_risk_label = if_else(pred_prob >= 0.5, "High Risk", "Low Risk")
+  )
+
+# --- 4. Join Predictions back to Map Geometry ---
+forecast_map <- philly_tracts %>%
+  left_join(future_input, by = "GEOID") %>%
+  filter(!is.na(pred_prob))
+```
+
+## 5.1 Visualize the Forecast (Probability Map)
+
+```{r}
+ggplot(forecast_map) +
+  geom_sf(aes(fill = pred_prob), color = NA) +
+  scale_fill_viridis_c(
+    option = "rocket", 
+    direction = -1, 
+    name = "Risk Probability",
+    labels = percent
+  ) +
+  labs(
+    title = "Forecast: Eviction Risk Probability (Nov 2025 – Nov 2026)",
+    subtitle = "Predicted by Model 5 (Full Integrated Model)\nDarker/Red areas indicate >80% probability of high eviction activity",
+    caption = "Source: Philadelphia Eviction Data"
+  ) +
+  mapTheme +
+  theme(legend.position = "right")
+```
+## 5.2.1 Visualize the Forecast (Binary Risk Map)
+
+```{r}
+# --- 1. Create Multiple Scenarios ---
+future_scenarios <- future_input %>%
+  mutate(
+    # Strategy A: High Recall (Catch almost all potential risks, but more false alarms)
+    `Strategy: > 0.3 (Aggressive)` = if_else(pred_prob > 0.3, "High Risk", "Low Risk"),
+    
+    # Strategy B: Balanced (The statistical default)
+    `Strategy: > 0.5 (Balanced)`   = if_else(pred_prob > 0.5, "High Risk", "Low Risk"),
+    
+    # Strategy C: High Precision (Target only the absolute worst hotspots)
+    `Strategy: > 0.8 (Conservative)` = if_else(pred_prob > 0.8, "High Risk", "Low Risk")
+  ) %>%
+  # Convert wide format to long format for plotting
+  pivot_longer(
+    cols = starts_with("Strategy"),
+    names_to = "Strategy_Name",
+    values_to = "Risk_Label"
+  )
+
+# --- 2. Join to Geometry ---
+# Note: This will triple the number of rows (one geometry per strategy per tract)
+scenario_map <- philly_tracts %>%
+  left_join(future_scenarios, by = "GEOID") %>%
+  filter(!is.na(Risk_Label))
+
+# --- 3. Plot Side-by-Side Maps ---
+ggplot(scenario_map) +
+  geom_sf(aes(fill = Risk_Label), color = "white", lwd = 0.01) +
+  scale_fill_manual(
+    values = c("High Risk" = "#d73027", "Low Risk" = "#4575b4"),
+    name = "Risk Class"
+  ) +
+  # This creates the 3 panels
+  facet_wrap(~ Strategy_Name, ncol = 3) + 
+  labs(
+    title = "Policy Trade-offs: Comparing Intervention Thresholds",
+    subtitle = "How does the definition of 'High Risk' change our target areas for 2026?",
+    caption = "Aggressive (>0.3) = Max Coverage | Balanced (>0.5) = Standard | Conservative (>0.8) = Max Precision"
+  ) +
+  mapTheme +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 11, face = "bold") # Make panel titles larger
+  )
+```
+
+# 6 Summary of Findings (Conclusion)
+```{r}
+# Calculate summary statistics for the report text
+n_high_risk <- sum(future_input$pred_risk_label == "High Risk")
+pct_high_risk <- round(mean(future_input$pred_risk_label == "High Risk") * 100, 1)
+
+# Identify the top 5 highest risk tracts
+top_risk_tracts <- future_input %>%
+  arrange(desc(pred_prob)) %>%
+  head(5) %>%
+  select(GEOID, pred_prob, lag_mean_monthly, pov_rate)
+
+print(paste("Total High Risk Tracts Predicted:", n_high_risk))
+print(paste("Percentage of City:", pct_high_risk, "%"))
+print(top_risk_tracts)
 ```
