@@ -19,7 +19,11 @@ execute:
   message: false
 ---
 
-# Introduction
+# Introduction: Predicting the 2026 Housing Cliff
+
+As Philadelphia approaches 2026, the city faces an unprecedented "housing cliff" driven by federal policy shocks. New mandates are shifting away from the "Housing First" model and enforcing stricter NSPIRE inspection standards, threatening the funding for approximately 1,200 permanent supportive housing units and risking mass disqualifications of affordable stock.
+
+In this volatile landscape, relying solely on historical averages is insufficient. This project develops a spatial predictive model to forecast eviction risk for the Nov 2025 – Nov 2026 period. By integrating structural distress indicators (L&I violations), spatial context, and demographic data, we aim to identify the specific census tracts most vulnerable to this new wave of instability, enabling a "High Precision" allocation of limited legal aid resources.
 
 ------------------------------------------------------------------------
 
@@ -157,7 +161,15 @@ hotspots <- read_csv("data/philadelphia_hotspots_media_report.csv") %>%
 
 ```
 
-Now we have: - **City-level series** (`philly_barchart`) - **Tract-level monthly data over multiple years** (`philly_monthly`) - **Snapshot map** (`philly_map`) - **Group-level disparities** (`philly_linechart`) - **Structural context** (historical violations, hotspot landlords)
+**Data sources**:
+
+Primary dataset:
+Eviction Lab – Philadelphia Tracking
+- City-level series
+- Tract-level monthly data over multiple years
+- Tract-level snapshot of Philadelphia eviction risk (since Nov 2024)
+- Group-level disparities
+- landlord hotspots
 
 # 2. Exploratory Data Analysis
 
@@ -225,52 +237,6 @@ ggplot(philly_barchart2, aes(x = date, y = month_filings)) +
 2.Beginning in 2022, filings rebound sharply—but not uniformly across seasons. -Summer 2022 displays one of the largest spikes in the dataset. -Fall and Spring quickly rise back to their historical levels. -Winter rebounds more unevenly but eventually stabilizes. So the seasonal cut reveals that the return to “normal” was staggered, with some seasons experiencing larger surges than others.
 
 3.From 2023 onward, virtually every season settles at or slightly above its long-term seasonal baseline. This indicates a new post-pandemic equilibrium where eviction activity has stabilized.
-
-```{r eda_claim_severity}
-
-# Median claim over time
-p1 <- ggplot(philly_claims_monthly, aes(x = month_date, y = median_claim)) +
-  geom_line() +
-  geom_hline(aes(yintercept = median_claim_baseline), linetype = "dashed") +
-  labs(
-    title = "Median Eviction Claim Over Time",
-    x = "Month",
-    y = "Median claim amount ($)",
-    caption = "Dashed line: pre-pandemic median claim"
-  ) +
-  plotTheme
-
-# Share of very small vs very large claims
-philly_claims_long <- philly_claims_monthly %>%
-  select(month_date, sub1000, sub_med_rent, over_six_months_rent) %>%
-  pivot_longer(
-    cols = -month_date,
-    names_to = "claim_type",
-    values_to = "share"
-  ) %>%
-  mutate(
-    claim_type = recode(
-      claim_type,
-      sub1000             = "Claims < $1,000",
-      sub_med_rent        = "Claims < median rent",
-      over_six_months_rent = "Claims > 6 months of rent"
-    )
-  )
-
-p2 <- ggplot(philly_claims_long, aes(x = month_date, y = share, color = claim_type)) +
-  geom_line() +
-  scale_y_continuous(labels = percent) +
-  labs(
-    title = "Distribution of Claim Sizes Over Time",
-    x = "Month",
-    y = "Share of filings",
-    color = NULL
-  ) +
-  plotTheme +
-  theme(legend.position = "bottom")
-
-grid.arrange(p1, p2, ncol = 1)
-```
 
 ## 2.2 Tract-level risk and spatial patterns
 
@@ -388,8 +354,7 @@ ggplot(
 
 Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first.
 
-### Persistence of high-risk tracts (spatial pattern)
-
+### Persistence of high-risk tracts 
 ```{r}
 
 threshold <- quantile(map_sf$month_rate, 0.8, na.rm = TRUE)
@@ -413,35 +378,10 @@ ggplot(risk_sf) +
     title = "Persistence of High Eviction Risk Across Tracts",
     fill  = "Months above 80th percentile"
   ) +
+  coord_sf(datum = NA) +
+  theme_void() +
   theme_minimal()
 
-
-```
-
-```{r eda_group_disparities}
-philly_linechart_share <- philly_linechart %>%
-  group_by(month) %>%
-  mutate(
-    share = month_filings / sum(month_filings, na.rm = TRUE)
-  ) %>%
-  ungroup() %>%
-  mutate(month_date = my(month))  # "11/2024" → 2024-11-01
-
-ggplot(
-  philly_linechart_share,
-  aes(x = month_date, y = share, color = group)
-) +
-  geom_line() +
-  scale_y_continuous(labels = percent) +
-  labs(
-    title    = "Share of Eviction Filings by Group Over Time",
-    subtitle = "Each month: group's filings / total filings",
-    x = "Month",
-    y = "Share of filings",
-    color = "Group"
-  ) +
-  plotTheme +
-  theme(legend.position = "bottom")
 
 ```
 
@@ -463,8 +403,12 @@ ggplot() +
     subtitle = "Bubble size shows number of filings",
     size = "Filings"
   ) +
+  coord_sf(datum = NA) +
+  theme_void() +
   theme_minimal()
 ```
+The map reveals that eviction activity is not driven solely by tenant poverty, but also by landlord behavior. The large red bubbles represent the specific locations of the city's top filers. We observe that high-volume eviction filing is not evenly distributed; it is highly concentrated among a specific subset of property owners.
+The spatial pattern is stark and non-random. The largest clusters of high-volume filers are located in: North Philadelphia and West Philadelphia. 
 
 # 3.Get Philadelphia Spatial Context
 
@@ -474,6 +418,11 @@ We want to add **structural predictors**:
 -   Demographics & housing (ACS)\
 -   Landlord concentration (hotspots)\
 -   Housing quality (old violations)
+
+Additional dataset:
+ACS (American Community Survey) 5-year 2022 data for Philadelphia census tracts
+Historic code-violation (2012-2016) (From Licenses and Inspections Department of Philadelphia)
+311 Service and Information Requests
 
 ## 3.1 Base tract list
 
@@ -564,7 +513,9 @@ map_sf_context <- map_sf_context %>%
   )
 ```
 
-## 3.4 Add historic code-violation intensity
+## 3.4 Add historic code-violation intensity (2012-2016)
+
+To capture long-term structural neglect, we transformed historical code violation data (2012–2016) from individual geographic points into a tract-level density metric. We spatially joined each violation instance to its corresponding census tract, aggregated the total counts, and normalized them by population to derive the 'Violations per 1,000 Residents' (viol_per_1k) variable. This serves as a standardized proxy for 'legacy distress' within the built environment, distinguishing chronic disrepair from recent instability.
 
 ```{r spatial_violations, message=FALSE, warning=FALSE}
 # Violations as points
@@ -603,6 +554,8 @@ map_sf_context <- map_sf_context %>%
 ```
 
 ## 3.5 311 housing-related complaint data
+
+To quantify localized housing distress, we processed raw 311 service request data by filtering for ten specific housing-related categories recorded during 2025. These individual incidents were spatially joined to census tracts to aggregate point-level data into neighborhood-level counts. Finally, we normalized these figures by total population to create a standardized 'Complaints per 1,000 Residents' metric (housing311_per_1k), serving as a dynamic proxy for property mismanagement and structural neglect.
 
 ```{r add_311_housing, message=FALSE, warning=FALSE}
 
@@ -666,6 +619,9 @@ housing311_by_tract <- housing311_tract %>%
 ## 4.1 Master Data Setup & Feature Engineering
 
 ### 4.1.1 Define Custom Time Periods (The "Nov-Nov" Fix)
+
+To align our historical training data with the target prediction window (November 2025 – November 2026), we engineered a custom time period variable (period_year). Standard calendar years (Jan–Dec) were replaced with 'Eviction Years' that run from November to October. For instance, data from November and December of 2020 were reassigned to the '2021 Period.' This ensures that every year in our panel represents a full 12-month cycle that perfectly mirrors the seasonal structure of our final forecast.
+
 ```{r}
 
 #  Prepare the Monthly Data with Custom Time Periods
@@ -688,8 +644,6 @@ panel_setup <- philly_monthly %>%
   # Filter out data before Nov 2020 to ensure we have full 12-month cycles
   filter(period_year >= 2021)
 ```
-
-*need int
 
 ### 4.1.2 Build Basic Tract-Year Panel 
 
@@ -812,11 +766,9 @@ training_data <- model_df_lagged %>%
   left_join(legacy_distress_join, by = "GEOID") %>%
   left_join(hotspot_join, by = "GEOID") %>%
   left_join(housing311_join, by = "GEOID") %>%
-  
-  # --- FIX: Now these match the names defined in 4.1.3 ---
   left_join(dist_center_join, by = "GEOID") %>%
-  left_join(dist_hotspot_join, by = "GEOID") %>%  # Added missing join
-  left_join(cluster_join, by = "GEOID") %>%       # Added missing cluster join
+  left_join(dist_hotspot_join, by = "GEOID") %>%  
+  left_join(cluster_join, by = "GEOID") %>%       
   
   # Handle NAs created by joins (fill counts with 0)
   mutate(
@@ -832,6 +784,8 @@ training_data <- model_df_lagged %>%
 ## 4.2 Model Building
 
 ### 4.2.1 Train/Test Split
+
+We employed a Time-Based Train/Test Split (Temporal Splitting) combined with Complete Case Analysis. Instead of randomly shuffling the data (which is standard for non-time-series problems), we split the dataset chronologically.
 
 ```{r}
 # 1. Define Variables
@@ -850,6 +804,13 @@ test_set  <- model_data %>% filter(period_year == 2025)
 ```
 
 ###4.2.2 Build 5 Competing Models
+
+We employed Hierarchical Model Building using Logistic Regression.
+
+- Model 1 (Baseline): Tests "Inertia" (does past risk predict future risk?)
+- Models 2-4 (Thematic): Test specific domains (Demographics, Built Environment, Spatial Context).
+- Model 5 (Integrated): A comprehensive model combining all domains.
+
 ```{r}
 # --- Model 1: Inertia Only (Lag) ---
 formula_1 <- high_risk ~ lag_mean_monthly
@@ -881,6 +842,8 @@ m5 <- glm(formula_5, data = train_set, family = "binomial")
 ```
 
 ### 4.2.3 Compare Model Performance
+
+We applied three standard statistical metrics to the 2025 Test Set: AUC,Accuracy and AIC.
 
 ```{r}
 library(pROC)
@@ -918,6 +881,8 @@ results <- data.frame(
 library(knitr)
 kable(results, digits = 3, caption = "Model Comparison Table (Test Set Performance)")
 ```
+The results establish Model 5 (Full Integrated) as the champion. While Model 4 (Spatial) achieved a marginally higher AUC (0.975 vs 0.969), Model 5 demonstrated superior Accuracy (94.3%), correctly classifying the vast majority of tracts in the 2025 test set. Crucially, Model 5 achieved the lowest AIC (609.176), significantly outperforming the baseline models (AIC > 700). This drastic drop in AIC confirms that the added complexity—combining demographics, built environment, and spatial features—provides essential explanatory power rather than noise. Therefore, we select Model 5 as the most robust instrument for forecasting 2026 risk.
+
 ### 4.2.4 Visual Comparison (ROC Curves)
 
 ```{r}
@@ -936,9 +901,45 @@ ggroc(list(M1=roc1, M2=roc2, M3=roc3, M4=roc4, M5=roc5), size = 1) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
 ```
+
+### 4.2.5 Check Feature Importance
+```{r}
+library(caret)
+
+# 1. Calculate Variable Importance
+# For GLM, this calculates the absolute value of the t-statistic (or z-statistic)
+importance_df <- varImp(m5, scale = FALSE)
+
+# 2. Convert to a clean Data Frame for Plotting
+importance_plot_df <- importance_df %>%
+  as.data.frame() %>%
+  rownames_to_column("Feature") %>%
+  arrange(desc(Overall)) %>%
+  # Remove the intercept (it's not a feature)
+  filter(Feature != "(Intercept)")
+
+# 3. Visualize
+ggplot(importance_plot_df, aes(x = reorder(Feature, Overall), y = Overall)) +
+  geom_col(fill = "#3182bd") +
+  coord_flip() +  # Horizontal bars are easier to read
+  labs(
+    title = "Feature Importance: What drives Eviction Risk?",
+    subtitle = "Based on Model 5 (Full Integrated Model)",
+    x = NULL,
+    y = "Importance Score (Absolute z-statistic)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11, face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+```
+
+Our feature importance analysis reveals that Historical Inertia and Landlord Behavior are the primary drivers of eviction risk.
+
 ## 4.3 Diagnostics on the Winning Model (M5)
 
-### 4.3.1
+### 4.3.1 Spatial Autocorrelation Diagnostic
 
 We check if the Full Model successfully removed spatial clustering in errors.
 ```{r}
@@ -963,7 +964,38 @@ moran_result <- moran.test(resid_sf$m5_residuals, lw)
 print(moran_result)
 ```
 
-### 4.3.2 Robustness Check: Spatial Cross-Validation (LOGOCV)
+The Moran’s I test on the residuals yielded a statistic of 0.115 with a p-value < 0.05.
+The value is relatively close to 0 (which indicates perfect randomness). This suggests that our model has successfully explained the vast majority of spatial patterns in eviction risk.And the result of p-value is still statistically significant.
+
+### 4.3.2 Visualize Spatial Error Patterns (Residual Map)
+
+We visualized the Deviance Residuals of Model 5 to identify local pockets of model error. By mapping these residuals, we can diagnose if the model systematically biases its predictions in specific neighborhoods.
+
+```{r}
+ggplot(resid_sf) +
+  geom_sf(aes(fill = m5_residuals), color = NA) +
+  scale_fill_gradient2(
+    low = "#4575b4",   # Blue: Model predicted High, Actual was Low (Overestimation)
+    mid = "white",     # White: Perfect Prediction
+    high = "#d73027",  # Red:  Model predicted Low, Actual was High (Underestimation)
+    midpoint = 0,
+    name = "Deviance\nResiduals"
+  ) +
+  labs(
+    title = "Map of Model Errors (Residuals)",
+    subtitle = "Where is Model 5 failing?",
+    caption = "Red = Underestimation (Missed Risk) | Blue = Overestimation (False Alarm)"
+  ) +
+  mapTheme +
+  theme(legend.position = "right")
+```
+
+While the errors show some local clustering (consistent with our Moran's I result of 0.115), they do not show a city-wide systemic bias. This confirms Model 5 is generally robust.
+
+### 4.3.3 Spatial Cross-Validation (LOGOCV)
+
+We used the 5 Neighborhood Clusters (created in Section 4.1.3) as the splitting criteria. In each round of validation, we completely held out one entire cluster of neighborhoods and trained the model on the remaining four clusters. We then asked the model to predict risk in the unseen cluster.
+
 ```{r}
 library(caret)
 
@@ -1001,12 +1033,15 @@ model_spatial_cv <- train(
 # 4. Print Results
 print(model_spatial_cv)
 ```
+
+Comparing this to our temporal test result (AUC ~0.969), the drop to 0.91 is expected and healthy. It indicates that while the model relies partly on local history ('Inertia'), it still retains excellent predictive power (0.91) even when blindfolded to specific neighborhood locations. This confirms the model has learned structural rules about eviction risk.
+
 #5. Prediction for 2026 (The Future)
 
 We use the "Full Integrated Model" (M5) to forecast risk. The input for this prediction is the data from the most recent period (Nov 2024 – Nov 2025).
 
 ```{r}
-# --- 1. Prepare the Input Data for 2026 ---
+#  1. Prepare the Input Data for 2026 
 # Logic: To predict 2026, the "lagged history" is the actual performance of 2025.
 
 future_input <- training_data %>%
@@ -1023,19 +1058,19 @@ future_input <- training_data %>%
   ) %>%
   drop_na()
 
-# --- 2. Generate Predictions ---
+#  2. Generate Predictions 
 # We use Model 5 (m5) to predict probabilities (0 to 1)
 # type = "response" output probabilities
 future_input$pred_prob <- predict(m5, newdata = future_input, type = "response")
 
-# --- 3. Classify Risk ---
+#  3. Classify Risk 
 # We interpret > 50% probability as "High Risk"
 future_input <- future_input %>%
   mutate(
     pred_risk_label = if_else(pred_prob >= 0.5, "High Risk", "Low Risk")
   )
 
-# --- 4. Join Predictions back to Map Geometry ---
+#  4. Join Predictions back to Map Geometry 
 forecast_map <- philly_tracts %>%
   left_join(future_input, by = "GEOID") %>%
   filter(!is.na(pred_prob))
@@ -1060,8 +1095,15 @@ ggplot(forecast_map) +
   mapTheme +
   theme(legend.position = "right")
 ```
+
+High-Intensity Clusters: The darkest areas (probabilities > 75%) are tightly clustered in specific corridors of North and West Philadelphia. This indicates that the model is extremely confident that these specific neighborhoods will experience severe eviction pressure in 2026.
+
 ## 5.2.1 Visualize the Forecast (Binary Risk Map)
 
+We use three distinct cutoffs:
+- Aggressive (> 0.3): This casts a wide net to catch as many potential eviction cases as possible, accepting a higher rate of false alarms.
+- Balanced (> 0.5): This uses the standard statistical default.
+- Conservative (> 0.8): This targets only the 'sure bets' to minimize wasted resources.
 ```{r}
 # --- 1. Create Multiple Scenarios ---
 future_scenarios <- future_input %>%
@@ -1109,6 +1151,8 @@ ggplot(scenario_map) +
   )
 ```
 
+**Recommendation**: Given the looming 2026 funding cuts, we recommend this 'High Precision' strategy for allocating expensive resources (like direct rental assistance), while reserving the 'Aggressive' strategy for low-cost interventions (like information campaigns).
+
 # 6 Summary of Findings (Conclusion)
 ```{r}
 # Calculate summary statistics for the report text
@@ -1125,3 +1169,6 @@ print(paste("Total High Risk Tracts Predicted:", n_high_risk))
 print(paste("Percentage of City:", pct_high_risk, "%"))
 print(top_risk_tracts)
 ```
+
+Our Model 5 forecast projects that 71 census tracts will be classified as 'High Risk' in the upcoming year. These 71 tracts represent exactly 20.2% of the city's neighborhoods. This finding is remarkably consistent with the Pareto Principle (80/20 rule) we observed in the historical data, confirming that the 2026 crisis will likely remain highly concentrated rather than spreading evenly across the city.
+For these specific neighborhoods, the model is effectively finding 'near certainty' of high eviction activity. These areas should be the immediate first stop for any 'High Precision' legal aid deployment, as they represent the absolute epicenter of displacement risk.
