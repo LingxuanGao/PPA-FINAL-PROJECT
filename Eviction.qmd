@@ -883,7 +883,7 @@ kable(results, digits = 3, caption = "Model Comparison Table (Test Set Performan
 ```
 The results establish Model 5 (Full Integrated) as the champion. While Model 4 (Spatial) achieved a marginally higher AUC (0.975 vs 0.969), Model 5 demonstrated superior Accuracy (94.3%), correctly classifying the vast majority of tracts in the 2025 test set. Crucially, Model 5 achieved the lowest AIC (609.176), significantly outperforming the baseline models (AIC > 700). This drastic drop in AIC confirms that the added complexity—combining demographics, built environment, and spatial features—provides essential explanatory power rather than noise. Therefore, we select Model 5 as the most robust instrument for forecasting 2026 risk.
 
-### 4.2.4 Visual Comparison (ROC Curves)
+### 4.2.4 a Visual Comparison (ROC Curves)
 
 ```{r}
 # Generate ROC objects
@@ -901,8 +901,15 @@ ggroc(list(M1=roc1, M2=roc2, M3=roc3, M4=roc4, M5=roc5), size = 1) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
 ```
+### 4.2.5 Check Multicollinearity
+```{r}
+library(car)
 
-### 4.2.5 Check Feature Importance
+vif(m5)
+```
+VIF diagnostic confirms that Model 5 is statistically  free from severe multicollinearity issues.
+
+### 4.2.6 Check Feature Importance
 ```{r}
 library(caret)
 
@@ -1153,7 +1160,8 @@ ggplot(scenario_map) +
 
 **Recommendation**: Given the looming 2026 funding cuts, we recommend this 'High Precision' strategy for allocating expensive resources (like direct rental assistance), while reserving the 'Aggressive' strategy for low-cost interventions (like information campaigns).
 
-# 6 Summary of Findings (Conclusion)
+# 6 Summary of Findings 
+## 6.1 Conclusion
 ```{r}
 # Calculate summary statistics for the report text
 n_high_risk <- sum(future_input$pred_risk_label == "High Risk")
@@ -1172,3 +1180,9 @@ print(top_risk_tracts)
 
 Our Model 5 forecast projects that 71 census tracts will be classified as 'High Risk' in the upcoming year. These 71 tracts represent exactly 20.2% of the city's neighborhoods. This finding is remarkably consistent with the Pareto Principle (80/20 rule) we observed in the historical data, confirming that the 2026 crisis will likely remain highly concentrated rather than spreading evenly across the city.
 For these specific neighborhoods, the model is effectively finding 'near certainty' of high eviction activity. These areas should be the immediate first stop for any 'High Precision' legal aid deployment, as they represent the absolute epicenter of displacement risk.
+
+## 6.2 Limitations
+
+1. **Reporting Bias in 311 data**: Our model uses 311 complaints as a proxy for housing distress.However, the tenants in the most vulnerable neighborhoods may be less likely to report violations than residents in gentrifying areas.For example, they fear landlord retaliations. So our model may paradoxically interpret a lack of complaints as "stability" in areas that are actually suffering from silent, unreported neglect.
+
+2. **Reporting Bias in 311 data**: Our predictions operate at the Census Tract level. High-risk classification for a tract does not mean every property in that tract is at risk. So interventions should be verified at the individual property level to avoid wasting resources on stable buildings within distressed areas.
