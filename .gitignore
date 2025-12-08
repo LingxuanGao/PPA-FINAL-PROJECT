@@ -48,3 +48,6 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 data/public_cases_fc.csv
+
+/.quarto/
+**/*.quarto_ipynb

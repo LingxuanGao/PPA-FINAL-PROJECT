@@ -1,24 +1,15 @@
 ---
-title: "MUSA 5080 Portfolio"
+title: "MUSA 5080 Final Project Portfolio"
 ---
 
 # Welcome to My Portfolio
 
-This portfolio documents my learning journey in Public Policy Analytics (MUSA 5080).
+This portfolio documents our final project of Eviction Risk Prediction in Philadelphia in Public Policy Analytics (MUSA 5080).
 
-## About This Course
-Advanced spatial analysis and data science for urban planning and public policy.
+## About Our team
+Name: Lingxuan Gao <br>, Xiaoqing Chen
 
-## Portfolio Structure
-- **Weekly Notes:** My learning reflections and key concepts
-- **Labs:** Completed assignments and analyses
-- **Final Project:** Capstone modeling challenge
-
-## About Me
-Name: Lingxuan Gao (Lucian)<br>
-Background: Urban Planning<br>
-I'm very interested in the combination of urban content and technical skills.
 
 ## Contact
 - Email: [gao459@upenn.edu]
-- GitHub: [@LingxuanGao]
+
