@@ -1,0 +1,58 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Lingxuan Gao - MUSA 5080 Portfolio"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: Weekly Notes
+        menu: 
+          - href: weekly-notes/week-01-notes.qmd
+            text: "Weekly Notes 01: Introduction to R and dplyr"
+          - href: weekly-notes/week-02-notes.qmd
+            text: "Weekly Notes 02: Algorithmic Decision Making & The Census"
+          - href: weekly-notes/week-03-notes.qmd
+            text: "Weekly Notes 03: Data Visualization & Exploratory Analysis"
+          - href: weekly-notes/week-04-notes.qmd
+            text: "Weekly Notes 04: Spatial Data & GIS Operations in R" 
+          - href: weekly-notes/week-05-notes.qmd
+            text: "Weekly Notes 05: Introduction to Linear Regression"
+          - href: weekly-notes/week-11-notes.qmd
+            text: "Weekly Notes 11: Space-Time Prediction"
+      
+      - text: Labs
+        menu:
+          - href: labs/lab_0/lab0_template.qmd
+            text: "Lab 0: dplyr Basics"
+          - href: labs/lab_1/assignment1_template.qmd          
+            text: "Lab 1: Census Data Quality for Policy Decisions"
+          - href: labs/lab_2/Lingxuan_Gao_assignment2_template.qmd          
+            text: "Lab 2: Spatial Analysis and Visualization-Healthcare Access and Equity in Pennsylvania"
+          - href: labs/lab_4/Lingxuan_Gao_assignment_4.qmd
+            text: "Lab 4: Spatial Predictive Analysis"
+          - href: labs/lab_5/Gao_Xu_assignment_5.qmd
+            text: "Lab 5: Space-Time Prediction"
+      - text: Midterm
+        menu:
+          - href: "Midterm/Yang_Chen_Fang_Gao_Xiang_Zhao_Appendix.qmd"
+            text: "Appendix"
+          - href: "Midterm/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.qmd"
+            text: "Presentation"
+      - text: Final
+        menu:
+          - href: "Final/Eviction.qmd"
+            text: "Eviction Risk Prediction in Philadelphia"
+              
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+    css: styles.css
+    page-layout: full
+
+execute:
+  freeze: auto
