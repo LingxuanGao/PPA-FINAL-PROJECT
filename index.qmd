@@ -2,12 +2,12 @@
 title: "MUSA 5080 Final Project Portfolio"
 ---
 
-# Welcome to My Portfolio
+# Welcome to Our Portfolio
 
 This portfolio documents our final project of Eviction Risk Prediction in Philadelphia in Public Policy Analytics (MUSA 5080).
 
 ## About Our team
-Name: Lingxuan Gao <br>, Xiaoqing Chen
+Name: Lingxuan Gao, Xiaoqing Chen
 
 
 ## Contact
