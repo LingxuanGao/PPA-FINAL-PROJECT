@@ -31,8 +31,7 @@ To address the looming 2026 housing cliff, we propose a **Tiered Intervention St
 - Goal: Monitor for emerging hotspots and mitigate risk before it escalates.
 
 3. Property-Level Verification
-
-Since predictions are at the census tract level, we recommend verifying specific property conditions with local partners before allocating expensive resources to avoid false positives.
+- Since predictions are at the census tract level, we recommend verifying specific property conditions with local partners before allocating expensive resources to avoid false positives.
 
 ## Data sources
 
