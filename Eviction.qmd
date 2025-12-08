@@ -1,5 +1,5 @@
 ---
-title: "Eviction Risk in Philadelphia"
+title: "Eviction Risk Prediction in Philadelphia"
 author:
   - "Lingxuan Gao"
   - "Xiaoqing Chen"
@@ -163,12 +163,16 @@ hotspots <- read_csv("data/philadelphia_hotspots_media_report.csv") %>%
 
 **Data sources**:
 
-Primary dataset:
-Eviction Lab – Philadelphia Tracking
-- City-level series
-- Tract-level monthly data over multiple years
-- Tract-level snapshot of Philadelphia eviction risk (since Nov 2024)
-- Group-level disparities
+Primary dataset: Eviction Lab – Philadelphia Tracking 
+
+- City-level series 
+
+- Tract-level monthly data over multiple years 
+
+- Tract-level snapshot of Philadelphia eviction risk (since Nov 2024) 
+
+- Group-level disparities 
+
 - landlord hotspots
 
 # 2. Exploratory Data Analysis
@@ -354,7 +358,8 @@ ggplot(
 
 Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first.
 
-### Persistence of high-risk tracts 
+### Persistence of high-risk tracts
+
 ```{r}
 
 threshold <- quantile(map_sf$month_rate, 0.8, na.rm = TRUE)
@@ -407,8 +412,8 @@ ggplot() +
   theme_void() +
   theme_minimal()
 ```
-The map reveals that eviction activity is not driven solely by tenant poverty, but also by landlord behavior. The large red bubbles represent the specific locations of the city's top filers. We observe that high-volume eviction filing is not evenly distributed; it is highly concentrated among a specific subset of property owners.
-The spatial pattern is stark and non-random. The largest clusters of high-volume filers are located in: North Philadelphia and West Philadelphia. 
+
+The map reveals that eviction activity is not driven solely by tenant poverty, but also by landlord behavior. The large red bubbles represent the specific locations of the city's top filers. We observe that high-volume eviction filing is not evenly distributed; it is highly concentrated among a specific subset of property owners. The spatial pattern is stark and non-random. The largest clusters of high-volume filers are located in: North Philadelphia and West Philadelphia.
 
 # 3.Get Philadelphia Spatial Context
 
@@ -420,9 +425,12 @@ We want to add **structural predictors**:
 -   Housing quality (old violations)
 
 Additional dataset:
-ACS (American Community Survey) 5-year 2022 data for Philadelphia census tracts
-Historic code-violation (2012-2016) (From Licenses and Inspections Department of Philadelphia)
-311 Service and Information Requests
+
+- ACS (American Community Survey) 5-year 2022 data for Philadelphia census tracts 
+
+- Historic code-violation (2012-2016) (From Licenses and Inspections Department of Philadelphia)
+
+- 311 Service and Information Requests
 
 ## 3.1 Base tract list
 
@@ -645,7 +653,7 @@ panel_setup <- philly_monthly %>%
   filter(period_year >= 2021)
 ```
 
-### 4.1.2 Build Basic Tract-Year Panel 
+### 4.1.2 Build Basic Tract-Year Panel
 
 ```{r}
 # Aggregate from Monthly to Annual (Period) Level
@@ -696,8 +704,8 @@ model_df_lagged <- model_df %>%
 
 ```
 
-:::{.callout-note}
- We use 0.8 as the threshold because of The Pareto Principle / 80-20 Rule.
+::: callout-note
+We use 0.8 as the threshold because of The Pareto Principle / 80-20 Rule.
 :::
 
 ### 4.1.3 Prepare External Features (Context)
@@ -803,13 +811,13 @@ train_set <- model_data %>% filter(period_year < 2025)
 test_set  <- model_data %>% filter(period_year == 2025)
 ```
 
-###4.2.2 Build 5 Competing Models
+### 4.2.2 Build 5 Competing Models
 
 We employed Hierarchical Model Building using Logistic Regression.
 
-- Model 1 (Baseline): Tests "Inertia" (does past risk predict future risk?)
-- Models 2-4 (Thematic): Test specific domains (Demographics, Built Environment, Spatial Context).
-- Model 5 (Integrated): A comprehensive model combining all domains.
+-   Model 1 (Baseline): Tests "Inertia" (does past risk predict future risk?)
+-   Models 2-4 (Thematic): Test specific domains (Demographics, Built Environment, Spatial Context).
+-   Model 5 (Integrated): A comprehensive model combining all domains.
 
 ```{r}
 # --- Model 1: Inertia Only (Lag) ---
@@ -881,7 +889,8 @@ results <- data.frame(
 library(knitr)
 kable(results, digits = 3, caption = "Model Comparison Table (Test Set Performance)")
 ```
-The results establish Model 5 (Full Integrated) as the champion. While Model 4 (Spatial) achieved a marginally higher AUC (0.975 vs 0.969), Model 5 demonstrated superior Accuracy (94.3%), correctly classifying the vast majority of tracts in the 2025 test set. Crucially, Model 5 achieved the lowest AIC (609.176), significantly outperforming the baseline models (AIC > 700). This drastic drop in AIC confirms that the added complexity—combining demographics, built environment, and spatial features—provides essential explanatory power rather than noise. Therefore, we select Model 5 as the most robust instrument for forecasting 2026 risk.
+
+The results establish Model 5 (Full Integrated) as the champion. While Model 4 (Spatial) achieved a marginally higher AUC (0.975 vs 0.969), Model 5 demonstrated superior Accuracy (94.3%), correctly classifying the vast majority of tracts in the 2025 test set. Crucially, Model 5 achieved the lowest AIC (609.176), significantly outperforming the baseline models (AIC \> 700). This drastic drop in AIC confirms that the added complexity—combining demographics, built environment, and spatial features—provides essential explanatory power rather than noise. Therefore, we select Model 5 as the most robust instrument for forecasting 2026 risk.
 
 ### 4.2.4 a Visual Comparison (ROC Curves)
 
@@ -901,15 +910,19 @@ ggroc(list(M1=roc1, M2=roc2, M3=roc3, M4=roc4, M5=roc5), size = 1) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
 ```
+
 ### 4.2.5 Check Multicollinearity
+
 ```{r}
 library(car)
 
 vif(m5)
 ```
-VIF diagnostic confirms that Model 5 is statistically  free from severe multicollinearity issues.
+
+VIF diagnostic confirms that Model 5 is statistically free from severe multicollinearity issues.
 
 ### 4.2.6 Check Feature Importance
+
 ```{r}
 library(caret)
 
@@ -949,6 +962,7 @@ Our feature importance analysis reveals that Historical Inertia and Landlord Beh
 ### 4.3.1 Spatial Autocorrelation Diagnostic
 
 We check if the Full Model successfully removed spatial clustering in errors.
+
 ```{r}
 library(spdep)
 
@@ -971,8 +985,7 @@ moran_result <- moran.test(resid_sf$m5_residuals, lw)
 print(moran_result)
 ```
 
-The Moran’s I test on the residuals yielded a statistic of 0.115 with a p-value < 0.05.
-The value is relatively close to 0 (which indicates perfect randomness). This suggests that our model has successfully explained the vast majority of spatial patterns in eviction risk.And the result of p-value is still statistically significant.
+The Moran’s I test on the residuals yielded a statistic of 0.115 with a p-value \< 0.05. The value is relatively close to 0 (which indicates perfect randomness). This suggests that our model has successfully explained the vast majority of spatial patterns in eviction risk.And the result of p-value is still statistically significant.
 
 ### 4.3.2 Visualize Spatial Error Patterns (Residual Map)
 
@@ -1041,9 +1054,9 @@ model_spatial_cv <- train(
 print(model_spatial_cv)
 ```
 
-Comparing this to our temporal test result (AUC ~0.969), the drop to 0.91 is expected and healthy. It indicates that while the model relies partly on local history ('Inertia'), it still retains excellent predictive power (0.91) even when blindfolded to specific neighborhood locations. This confirms the model has learned structural rules about eviction risk.
+Comparing this to our temporal test result (AUC \~0.969), the drop to 0.91 is expected and healthy. It indicates that while the model relies partly on local history ('Inertia'), it still retains excellent predictive power (0.91) even when blindfolded to specific neighborhood locations. This confirms the model has learned structural rules about eviction risk.
 
-#5. Prediction for 2026 (The Future)
+# 5. Prediction for 2026 (The Future)
 
 We use the "Full Integrated Model" (M5) to forecast risk. The input for this prediction is the data from the most recent period (Nov 2024 – Nov 2025).
 
@@ -1103,14 +1116,18 @@ ggplot(forecast_map) +
   theme(legend.position = "right")
 ```
 
-High-Intensity Clusters: The darkest areas (probabilities > 75%) are tightly clustered in specific corridors of North and West Philadelphia. This indicates that the model is extremely confident that these specific neighborhoods will experience severe eviction pressure in 2026.
+High-Intensity Clusters: The darkest areas (probabilities \> 75%) are tightly clustered in specific corridors of North and West Philadelphia. This indicates that the model is extremely confident that these specific neighborhoods will experience severe eviction pressure in 2026.
 
 ## 5.2.1 Visualize the Forecast (Binary Risk Map)
 
-We use three distinct cutoffs:
-- Aggressive (> 0.3): This casts a wide net to catch as many potential eviction cases as possible, accepting a higher rate of false alarms.
-- Balanced (> 0.5): This uses the standard statistical default.
-- Conservative (> 0.8): This targets only the 'sure bets' to minimize wasted resources.
+We use three distinct cutoffs: 
+
+- Aggressive (\> 0.3): This casts a wide net to catch as many potential eviction cases as possible, accepting a higher rate of false alarms. 
+
+- Balanced (\> 0.5): This uses the standard statistical default. 
+
+- Conservative (\> 0.8): This targets only the 'sure bets' to minimize wasted resources.
+
 ```{r}
 # --- 1. Create Multiple Scenarios ---
 future_scenarios <- future_input %>%
@@ -1160,8 +1177,10 @@ ggplot(scenario_map) +
 
 **Recommendation**: Given the looming 2026 funding cuts, we recommend this 'High Precision' strategy for allocating expensive resources (like direct rental assistance), while reserving the 'Aggressive' strategy for low-cost interventions (like information campaigns).
 
-# 6 Summary of Findings 
+# 6 Summary of Findings
+
 ## 6.1 Conclusion
+
 ```{r}
 # Calculate summary statistics for the report text
 n_high_risk <- sum(future_input$pred_risk_label == "High Risk")
@@ -1178,11 +1197,16 @@ print(paste("Percentage of City:", pct_high_risk, "%"))
 print(top_risk_tracts)
 ```
 
-Our Model 5 forecast projects that 71 census tracts will be classified as 'High Risk' in the upcoming year. These 71 tracts represent exactly 20.2% of the city's neighborhoods. This finding is remarkably consistent with the Pareto Principle (80/20 rule) we observed in the historical data, confirming that the 2026 crisis will likely remain highly concentrated rather than spreading evenly across the city.
-For these specific neighborhoods, the model is effectively finding 'near certainty' of high eviction activity. These areas should be the immediate first stop for any 'High Precision' legal aid deployment, as they represent the absolute epicenter of displacement risk.
+Our Model 5 forecast projects that 71 census tracts will be classified as 'High Risk' in the upcoming year. These 71 tracts represent exactly 20.2% of the city's neighborhoods. This finding is remarkably consistent with the Pareto Principle (80/20 rule) we observed in the historical data, confirming that the 2026 crisis will likely remain highly concentrated rather than spreading evenly across the city. For these specific neighborhoods, the model is effectively finding 'near certainty' of high eviction activity. These areas should be the immediate first stop for any 'High Precision' legal aid deployment, as they represent the absolute epicenter of displacement risk.
 
 ## 6.2 Limitations
 
-1. **Reporting Bias in 311 data**: Our model uses 311 complaints as a proxy for housing distress.However, the tenants in the most vulnerable neighborhoods may be less likely to report violations than residents in gentrifying areas.For example, they fear landlord retaliations. So our model may paradoxically interpret a lack of complaints as "stability" in areas that are actually suffering from silent, unreported neglect.
+1.  **Reporting Bias in 311 data**: Our model uses 311 complaints as a proxy for housing distress.However, the tenants in the most vulnerable neighborhoods may be less likely to report violations than residents in gentrifying areas.For example, they fear landlord retaliations. So our model may paradoxically interpret a lack of complaints as "stability" in areas that are actually suffering from silent, unreported neglect.
 
-2. **Reporting Bias in 311 data**: Our predictions operate at the Census Tract level. High-risk classification for a tract does not mean every property in that tract is at risk. So interventions should be verified at the individual property level to avoid wasting resources on stable buildings within distressed areas.
+2.  **Census-Tract Scale, Not Individual Properties**: Our predictions operate at the Census Tract level. High-risk classification for a tract does not mean every property in that tract is at risk. So interventions should be verified at the individual property level to avoid wasting resources on stable buildings within distressed areas.
+
+## 6.3 Recommendations
+
+1. For small set of extreme hotspots, we could operate direct rent relief, full legal representation, intensive case management. Also, we need to verify needs at the property/household level with local partners before committing these high-cost resources.
+
+2. For wider ring of at-risk neighborhoods around the hotspots,  we can operate low-cost interventions – flyers, text alerts, know-your-rights workshops, landlord engagement. Also we can use this tier to reach areas where 311 distress may be under-reported, and monitor for emerging hotspots to feed back into the model.
