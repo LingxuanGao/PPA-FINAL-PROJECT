@@ -163,17 +163,17 @@ hotspots <- read_csv("data/philadelphia_hotspots_media_report.csv") %>%
 
 **Data sources**:
 
-Primary dataset: Eviction Lab – Philadelphia Tracking 
+Primary dataset: Eviction Lab – Philadelphia Tracking
 
-- City-level series 
+-   City-level series
 
-- Tract-level monthly data over multiple years 
+-   Tract-level monthly data over multiple years
 
-- Tract-level snapshot of Philadelphia eviction risk (since Nov 2024) 
+-   Tract-level snapshot of Philadelphia eviction risk (since Nov 2024)
 
-- Group-level disparities 
+-   Group-level disparities
 
-- landlord hotspots
+-   landlord hotspots
 
 # 2. Exploratory Data Analysis
 
@@ -277,7 +277,7 @@ This histogram shows that most census tracts have very low average eviction acti
 
 ### Load Spatial Data
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 
 # Read your GeoJSONs
 boundary <- st_read("data/City_Limits.geojson")
@@ -356,7 +356,9 @@ ggplot(
 
 ```
 
-Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first.
+Philly isn’t on fire everywhere—a handful of neighborhoods are overheating while others are holding steady or cooling down. Those red clusters are exactly where we’d point legal aid and rent relief first. Some areas show a 100% to 200% increase. 
+These are emerging hotspots. Historical averages cannot catch these sudden changes.
+
 
 ### Persistence of high-risk tracts
 
@@ -426,11 +428,11 @@ We want to add **structural predictors**:
 
 Additional dataset:
 
-- ACS (American Community Survey) 5-year 2022 data for Philadelphia census tracts 
+-   ACS (American Community Survey) 5-year 2022 data for Philadelphia census tracts
 
-- Historic code-violation (2012-2016) (From Licenses and Inspections Department of Philadelphia)
+-   Historic code-violation (2012-2016) (From Licenses and Inspections Department of Philadelphia)
 
-- 311 Service and Information Requests
+-   311 Service and Information Requests
 
 ## 3.1 Base tract list
 
@@ -638,7 +640,7 @@ panel_setup <- philly_monthly %>%
     # Convert text to Date
     month_date = my(month),
     
-    # --- CRITICAL FIX: Custom "Eviction Year" Logic ---
+    #  Custom "Eviction Year" Logic 
     # We want the year to start in November.
     # If month is Nov (11) or Dec (12), we assign it to the NEXT year.
     # Example: Nov 2020 -> Period 2021
@@ -660,7 +662,7 @@ panel_setup <- philly_monthly %>%
 model_df <- panel_setup %>% 
   group_by(GEOID, period_year) %>% 
   summarise(
-    # --- FIX: Variable Name Changed from filings_2020 ---
+    #  Variable Name Changed from filings_2020 
     filings_total = sum(filings_counts, na.rm = TRUE),
     mean_monthly  = mean(filings_counts, na.rm = TRUE),
     
@@ -1120,13 +1122,13 @@ High-Intensity Clusters: The darkest areas (probabilities \> 75%) are tightly cl
 
 ## 5.2.1 Visualize the Forecast (Binary Risk Map)
 
-We use three distinct cutoffs: 
+We use three distinct cutoffs:
 
-- Aggressive (\> 0.3): This casts a wide net to catch as many potential eviction cases as possible, accepting a higher rate of false alarms. 
+-   Aggressive (\> 0.3): This casts a wide net to catch as many potential eviction cases as possible, accepting a higher rate of false alarms.
 
-- Balanced (\> 0.5): This uses the standard statistical default. 
+-   Balanced (\> 0.5): This uses the standard statistical default.
 
-- Conservative (\> 0.8): This targets only the 'sure bets' to minimize wasted resources.
+-   Conservative (\> 0.8): This targets only the 'sure bets' to minimize wasted resources.
 
 ```{r}
 # --- 1. Create Multiple Scenarios ---
@@ -1207,6 +1209,6 @@ Our Model 5 forecast projects that 71 census tracts will be classified as 'High 
 
 ## 6.3 Recommendations
 
-1. For small set of extreme hotspots, we could operate direct rent relief, full legal representation, intensive case management. Also, we need to verify needs at the property/household level with local partners before committing these high-cost resources.
+1.  For small set of extreme hotspots, we could operate direct rent relief, full legal representation, intensive case management. Also, we need to verify needs at the property/household level with local partners before committing these high-cost resources.
 
-2. For wider ring of at-risk neighborhoods around the hotspots,  we can operate low-cost interventions – flyers, text alerts, know-your-rights workshops, landlord engagement. Also we can use this tier to reach areas where 311 distress may be under-reported, and monitor for emerging hotspots to feed back into the model.
+2.  For wider ring of at-risk neighborhoods around the hotspots, we can operate low-cost interventions – flyers, text alerts, know-your-rights workshops, landlord engagement. Also we can use this tier to reach areas where 311 distress may be under-reported, and monitor for emerging hotspots to feed back into the model.
